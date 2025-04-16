@@ -1,14 +1,11 @@
 import numpy as np
 import torch
-import torch.distributions as tfd
-from torch import nn, optim
-from torch.distributions import Independent, Normal
-from torch.utils.data import DataLoader, TensorDataset
+from torch.distributions import Normal
 from torchdiffeq import odeint, odeint_adjoint
-from tqdm import tqdm, trange
+from tqdm import tqdm
 
 
-class MLP(nn.Module):
+class MLP(torch.nn.Module):
     """
     Multilayer perceptron for learning the score function
     """
@@ -19,7 +16,7 @@ class MLP(nn.Module):
         n_conditionals=1,
         embedding_dimensions=8,
         units=[128],
-        activation=nn.SiLU(),
+        activation=torch.nn.SiLU(),
         sigma_initialization=16,
     ):
         super().__init__()
@@ -32,13 +29,13 @@ class MLP(nn.Module):
             + [n_dimensions]
         )
         self.n_layers = len(self.architecture) - 1
-        self.NN = nn.ModuleList(
+        self.NN = torch.nn.ModuleList(
             [
-                nn.Linear(self.architecture[layer], self.architecture[layer + 1])
+                torch.nn.Linear(self.architecture[layer], self.architecture[layer + 1])
                 for layer in range(self.n_layers)
             ]
         )
-        self.W = nn.Parameter(
+        self.W = torch.nn.Parameter(
             torch.randn(embedding_dimensions // 2) * sigma_initialization,
             requires_grad=False,
         )
@@ -310,7 +307,7 @@ class ScoreModel(torch.nn.Module):
         return state[0][1, ...], state[1][1, ...]
 
 
-class VESDE(nn.Module):
+class VESDE(torch.nn.Module):
     def __init__(self, sigma_min=1e-2, sigma_max=10.0, T=1.0, epsilon=1e-5):
         """
         Variance Exploding stochastic differential equation
@@ -382,7 +379,7 @@ class VESDE(nn.Module):
         return Normal(loc=mu, scale=self.sigma_max)
 
 
-class VPSDE(nn.Module):
+class VPSDE(torch.nn.Module):
     """
     Variance preserving stochastic differential equation.
     """
@@ -435,7 +432,7 @@ class VPSDE(nn.Module):
         return mean, std
 
 
-class SUBVPSDE(nn.Module):
+class SUBVPSDE(torch.nn.Module):
     """
     Sub-variance preserving stochastic differential equation.
     """
