@@ -78,28 +78,19 @@ class ScoreModel(torch.nn.Module):
     """
 
     def __init__(
-        self, model=None, sde=None, conditional=None, no_sigma=False, hutchinson=False
+        self, model=None, sde=None, conditional=None, hutchinson=False
     ):
         super().__init__()
 
-        # model assumed to return: score(x, t, conditional) if no_sigma is True
-        # model assumed to return: score(x, t, conditional) * sigma(t) if no_sigma is False
         self.model = model  # see above
         self.sde = sde
         self.conditional = conditional  # stores the conditioning variable
-        self.no_sigma = (
-            no_sigma  # if True, drops the 1/sigma(t) in the score definition
-        )
         self.prob = False
         self.hutch = hutchinson  # if True, uses the Hutchinson trace estimator
 
     def score(self, t, x, conditional=None):
-        if self.no_sigma:
             return self.model(t, x, conditional=conditional)
 
-        return self.model(t, x, conditional=conditional) / self.sde.sigma(t).view(
-            -1, *[1] * len(x.shape[1:])
-        )
 
     def loss_fn(self, x, conditional=None):
         return denoising_score_matching(self, x, conditional=conditional)
@@ -209,7 +200,6 @@ class ScoreModel(torch.nn.Module):
         atol=1e-4,
         rtol=1e-4,
         method="dopri5",
-        epsilon=1e-5,
         options=None,
     ):
 
@@ -259,7 +249,6 @@ class ScoreModel(torch.nn.Module):
         atol=1e-5,
         rtol=1e-5,
         method="dopri5",
-        epsilon=1e-5,
         options=None,
     ):
         """
@@ -570,7 +559,6 @@ class PopulationModelDiffusion(torch.nn.Module):
         shift=None,
         scale=None,
         method="dopri5",
-        no_sigma=False,
         hutchinson=False,
         options=None,
     ):
@@ -583,7 +571,7 @@ class PopulationModelDiffusion(torch.nn.Module):
         self.model = model
         self.sde = sde
         self.score_model = ScoreModel(
-            model=self.model, sde=self.sde, hutchinson=hutchinson, no_sigma=no_sigma
+            model=self.model, sde=self.sde, hutchinson=hutchinson        
         )
         self.register_buffer(
             "shift",
@@ -647,7 +635,6 @@ class PopulationModelDiffusionConditional(torch.nn.Module):
         scale=None,
         conditional_shift=None,
         conditional_scale=None,
-        no_sigma=False,
         method="dopri5",
         options=None,
     ):
@@ -656,7 +643,7 @@ class PopulationModelDiffusionConditional(torch.nn.Module):
 
         self.model = model
         self.sde = sde
-        self.score_model = ScoreModel(model=self.model, sde=self.sde, no_sigma=no_sigma)
+        self.score_model = ScoreModel(model=self.model, sde=self.sde)
         self.register_buffer(
             "shift",
             (
