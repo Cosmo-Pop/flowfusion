@@ -43,19 +43,22 @@ class SymplecticMLP(nn.Module):
         t_projected = t[:, None] * self.W[None, :] * 2 * math.pi
         t_embedded = torch.cat([torch.sin(t_projected), torch.cos(t_projected)], dim=1)
         
+        # The input for the q-dynamics network should contain p, and vice-versa.
         if conditional is not None:
-            input_q = torch.cat([q, conditional, t_embedded], dim=1)
-            input_p = torch.cat([p, conditional, t_embedded], dim=1)
+            # Input for q-dynamics contains p
+            input_for_q_dynamics = torch.cat([p, conditional, t_embedded], dim=1)
+            # Input for p-dynamics contains q
+            input_for_p_dynamics = torch.cat([q, conditional, t_embedded], dim=1)
         else:
-            input_q = torch.cat([q, t_embedded], dim=1)
-            input_p = torch.cat([p, t_embedded], dim=1)
+            input_for_q_dynamics = torch.cat([p, t_embedded], dim=1)
+            input_for_p_dynamics = torch.cat([q, t_embedded], dim=1)
             
-        # v_q only depends on p; v_p only depends on q. This is a common way to construct a symplectic map.
-        # Here we use a simpler formulation where v_q depends on q and v_p depends on p.
-        # For true zero divergence, one would be the negative gradient of the other, but this is an approximation.
-        # A simpler way: v_q(q) and v_p(p). This ensures block-diagonal Jacobian.
-        v_q = self.mlp_q_dynamics(input_q)
-        v_p = self.mlp_p_dynamics(input_p)
+        # This structure approximates a Hamiltonian system where H = H_q(q) + H_p(p).
+        # dq/dt = dH/dp = dH_p/dp  (which is a function of p)
+        # dp/dt = -dH/dq = -dH_q/dq (which is a function of q)
+        
+        v_q = self.mlp_q_dynamics(input_for_q_dynamics) # This computes dH/dp
+        v_p = -self.mlp_p_dynamics(input_for_p_dynamics) # This computes -dH/dq
         
         return torch.cat([v_q, v_p], dim=-1)
 
@@ -110,11 +113,21 @@ class SymplecticFlowModel(nn.Module):
         integration_times = torch.tensor([0.0, 1.0], device=device)
         final_state = odeint(ode_func, initial_state, integration_times, atol=atol, rtol=rtol)[-1]
         
-        z_q, z_p = torch.chunk(final_state, 2, dim=-1)
+        # Compute log probability of the full joint state z1 = (q1, p1)
+        log_p_z1 = torch.distributions.Normal(0, 1).log_prob(final_state).sum(dim=-1)
         
-        # A simplified log_prob calculation assuming near-zero divergence
-        log_p_z_q = torch.distributions.Normal(0, 1).log_prob(z_q).sum(dim=-1)
-        log_p_x = log_p_z_q - torch.sum(torch.log(self.scale))
+        # Compute log probability of initial momentum p0
+        log_p_p0 = torch.distributions.Normal(0, 1).log_prob(p0).sum(dim=-1)
+        
+        # Apply change of variables formula
+        # Since p1(z1) = p0(z0) and p0(z0) = p_data(q0) * p(p0)
+        # We have: p_data(q0) = p1(z1) / p(p0)
+        # In log space: log p_data(q0) = log p1(z1) - log p(p0)
+        log_p_x_normalized = log_p_z1 - log_p_p0
+        
+        # Account for the normalization of the data
+        log_p_x = log_p_x_normalized - torch.sum(torch.log(self.scale))
+        
         return log_p_x
 
 def create_symplectic_flow_model(pretrained_diffusion_model):
