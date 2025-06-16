@@ -7,7 +7,7 @@ authors = [
 ]
 license = {text = "MIT"}
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<4.0"
 dependencies = [
     "torchdiffeq (>=0.2.5,<0.3.0)",
     "torch (>=2.4.0,<3.0.0)",
