@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import torch.func
 from torch.distributions import Normal
 from torchdiffeq import odeint, odeint_adjoint
 from tqdm import tqdm
@@ -110,7 +111,6 @@ class ScoreModel(torch.nn.Module):
         f_tilde = f - 0.5 * g**2 * self.score(t, x, conditional=conditional)
         return f_tilde
 
-    # define the forward pass as the ode dx/dt, for torchdiffeq's benefit later (also include dP(x)/dt if self.prob=True, and will condition on self.conditional if this is not None)
     def forward(self, t, states):
 
         # extract x and batch size
@@ -128,19 +128,26 @@ class ScoreModel(torch.nn.Module):
             # Calculate the time derivative of the log determinant of the Jacobian.
             if self.prob is True:
                 if self.hutch is False:
-                    divergence = torch.autograd.grad(
-                        x_dot[:, 0].sum(), x, create_graph=True, retain_graph=True
-                    )[0][:, 0]
-                    for i in range(1, x.shape[1]):
-                        divergence = (
-                            divergence
-                            + torch.autograd.grad(
-                                x_dot[:, i].sum(),
-                                x,
-                                create_graph=True,
-                                retain_graph=True,
-                            )[0][:, i]
-                        )
+                    # Define a helper function to compute the trace of the Jacobian for a single sample.
+                    def get_trace_of_jacobian(x_sample, cond_sample):
+                        # Define the function whose Jacobian we want.
+                        def f(x_in):
+                            # Unsqueeze inputs for the model, which expects a batch dimension.
+                            cond_in = cond_sample.unsqueeze(0) if cond_sample is not None else None
+                            x_in_batched = x_in.unsqueeze(0)
+                            
+                            # Calculate the drift for the single, now-batched sample.
+                            drift = self.ode_drift(t, x_in_batched, conditional=cond_in)
+                            
+                            # Squeeze the batch dimension from the output to match input shape.
+                            return drift.squeeze(0)
+
+                        # Compute the Jacobian of f w.r.t x_sample and return its trace.
+                        return torch.trace(torch.func.jacrev(f)(x_sample))
+
+                    #Vectorize the helper function over the batch using vmap.
+                    in_dims = (0, 0) if self.conditional is not None else (0, None)
+                    divergence = torch.vmap(get_trace_of_jacobian, in_dims=in_dims)(x, self.conditional)
                 else:
                     divergence = torch.sum(
                         torch.autograd.grad(
