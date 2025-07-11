@@ -9,9 +9,29 @@ from typing import Tuple, List
 class ODEFlow(nn.Module):
     """
     ODE Flow model.
-    This class implements a conditional ODE flow using a neural network to model the dynamics.
-    It includes methods for computing the dynamics, sampling, and calculating the flow matching loss.
-    Note we define the ODE transform from a base unit normal (at t=T) to a target distribution (at t=0), ie., the forward transform integrates backwards in time, consistent with diffusion models.
+    
+    This class implements a conditional ODE flow using a neural network to model
+    the dynamics. It includes methods for computing the dynamics, sampling, 
+    and calculating the flow matching loss.
+
+    Note that we define the ODE transform from a base unit normal (at t=T) to a target
+    distribution (at t=0), i.e., the forward transform integrates backwards in time,
+    consistent with diffusion models.
+
+    Attributes
+    ----------
+    target_dimension : int
+        Dimension of the target distribution.
+    layers : torch.nn.ModuleList
+        List of neural network layers.
+    velocity : torch.nn.Sequential
+        Model for the dynamics of the flow.
+    target_shift : torch.Tensor
+        Shift to be applied to the target distribution.
+    target_scale : torch.Tensor
+        Scale to be applied to the target distribution.
+    twopi : torch.Tensor
+        Tensor containing 2*pi.
     """
 
     def __init__(
@@ -22,6 +42,20 @@ class ODEFlow(nn.Module):
         target_shift: Optional[torch.Tensor] = None,
         target_scale: Optional[torch.Tensor] = None,
     ):
+        """
+        Parameters
+        ----------
+        target_dimension : int, optional
+            Dimension of the target distribution.
+        hidden_units : list of int, optional
+            Number of hidden units per layer in the dynamics network.
+        activation : torch.nn.Module, optional
+            Activation function.
+        target_shift : torch.Tensor, optional
+            Shift to be applied to the target distribution.
+        target_scale : torch.Tensor, optional
+            Scale to be applied to the target distribution.
+        """
         super().__init__()
 
         # make a module list of layers
@@ -54,14 +88,21 @@ class ODEFlow(nn.Module):
 
     def dynamics(self, t: torch.Tensor, states: Tuple[torch.Tensor]):
         """
-        Computes the dynamics of the ODE flow.
+        Computes the dynamics, dx/dt, of the ODE flow.
 
-        Args:
-            t (torch.Tensor): Time tensor.
-            states (tuple): Tuple containing the current state and conditional inputs.
-                - states[0] (torch.Tensor): Current state (x). Note that x here is assumed to be normalized by the shift and scale.
-        Returns:
-            dxdt (torch.Tensor): The velocity field.
+        Parameters
+        ----------
+        t : torch.Tensor
+            Time tensor.
+        states : tuple of torch.Tensor
+            Tuple containing the current state.
+            Current state (x) is assumed to be in `states[0]`. 
+            Note that x here is assumed to be normalized by the shift and scale.
+        
+        Returns
+        -------
+        dxdt : torch.Tensor
+            The velocity field.
         """
 
         # extract states
@@ -83,16 +124,24 @@ class ODEFlow(nn.Module):
     ):
         """
         Computes the dynamics of the ODE flow and the log determinant of the Jacobian.
-        Args:
-            t (torch.Tensor): Time tensor.
-            states (tuple): Tuple containing the current state, conditional inputs, and log Jacobian.
-                - states[0] (torch.Tensor): Current state (x). Note that x here is assumed to be normalized by the shift and scale.
-                - states[1] (torch.Tensor): Log determinant of the Jacobian.
-        Returns:
-            dxdt (torch.Tensor): The velocity field.
-            divergence (torch.Tensor): Divergence of the velocity field.
-        """
+        These correspond to dx/dt and dp(x)/dt.
 
+        Parameters
+        ----------
+        t : torch.Tensor
+            Time tensor.
+        states : tuple of torch.Tensor
+            Tuple containing the current state, and log Jacobian.
+            Current state (x) is assumed to be in `states[0]`. 
+            Log Jacobian assumed to be in `states[1]`.
+            Note that x here is assumed to be normalized by the shift and scale.
+        Returns
+        -------
+        dxdt : torch.Tensor
+            The velocity field.
+        divergence : torch.Tensor
+            Divergence of the velocity field.
+        """
         # pull out the x, jacobian
         x, log_jacobian = states
 
@@ -119,13 +168,21 @@ class ODEFlow(nn.Module):
     # for the ODE solver: velocity field
     def forward(self, t: torch.Tensor, states: Tuple[torch.Tensor]):
         """
-        Computes the forward pass of the ODE flow.
-        Args:
-            t (torch.Tensor): Time tensor.
-            states (tuple): Tuple containing the current state and conditional inputs.
-                - states[0] (torch.Tensor): Current state (x). Note that x here is assumed to be normalized by the shift and scale.
-        Returns:
-            dxdt (torch.Tensor): The velocity field.
+        Computes the forward pass of the ODE flow, i.e., the velocity field.
+
+        Parameters
+        ----------
+        t : torch.Tensor
+            Time tensor.
+        states : tuple of torch.Tensor
+            Tuple containing the current state.
+            Current state (x) is assumed to be in `states[0]`. 
+            Note that x here is assumed to be normalized by the shift and scale.
+        
+        Returns
+        -------
+        dxdt : torch.Tensor
+            The velocity field.
         """
 
         return self.dynamics(t, states)
@@ -139,13 +196,21 @@ class ODEFlow(nn.Module):
     ):
         """
         Computes the ideal linear velocity field for the ODE flow.
-        Args:
-            x0 (torch.Tensor): Initial state (observed samples).
-            xT (torch.Tensor): Final state (base density).
-            t (torch.Tensor): Time tensor.
-        Returns:
-            xt (torch.Tensor): Interpolated state.
-            v_hat (torch.Tensor): Ideal velocity (dx/dt).
+
+        Parameters
+        ----------
+        x0 : torch.Tensor
+            Initial state at t=0 (observed samples).
+        xT : torch.Tensor
+            Final state at t=T (base density).
+        t : torch.Tensor
+            Time tensor.
+        Returns
+        -------
+        xt : torch.Tensor
+            Interpolated state at times t.
+        v_hat : torch.Tensor
+            Ideal velocity (dx/dt).
         """
 
         # shift and scale x0: note that the model learns the dynamics for the normalized variable (via target shift and scale)
@@ -162,10 +227,15 @@ class ODEFlow(nn.Module):
         """
         Computes the flow matching loss for the ODE flow.
 
-        Args:
-            x (torch.Tensor): Initial state (observed samples).
-        Returns:
-            loss (torch.Tensor): Flow matching loss.
+        Parameters
+        ----------
+        x : torch.Tensor
+            Initial state at t=0 (observed samples).
+        
+        Returns
+        -------
+        loss : torch.Tensor
+            Flow matching loss.
         """
 
         # base samples
@@ -188,17 +258,24 @@ class ODEFlow(nn.Module):
     # function to transform base samples to the target under the ODE flow via odeint
     def sample(
         self,
-        xT: torch.Tensor,  # final state (base density)
+        xT: torch.Tensor,
         gradients: bool = False,
     ):
         """
-        This function transforms base samples to the target under the ODE flow via odeint, by integrating backwards in time from T=1 to 0.
+        This function transforms base samples to the target under the ODE flow
+        via odeint, by integrating backwards in time from t=T to t=0.
 
-        Args:
-            xT (torch.Tensor): Final state (base density).
-            gradients (bool): Whether to compute in a no_grad() context.
-        Returns:
-            x0 (torch.Tensor): Transformed samples.
+        Parameters
+        ----------
+        xT : torch.Tensor
+            Final state at t=T (base density).
+        gradients : bool, optional
+            Whether to compute in a `torch.no_grad()` context.
+
+        Returns
+        -------
+        x0 : torch.Tensor 
+            Transformed samples from target density at t=0.
         """
 
         # integration times (note: solving backwards in time)
@@ -238,30 +315,33 @@ class ODEFlow(nn.Module):
         adjoint: bool = False,
     ):
         """
-        This solves the pair of ODEs forward in time (0 (target) -> T (base)) to find the base x(t=T) samples and log probabilities associated with some input x(t=0) samples.
+        This solves the pair of ODEs forward in time (t=0 (target) -> t=T (base))
+        to find the base x(t=T) samples and log probabilities associated with 
+        some input x(t=0) samples.
 
-        Args:
-        x: torch.Tensor
-            The initial state x_0 (observed samples). Note this is assumed to be normalized by the shift and scale.
+        Parameters
+        ----------
+        x : torch.Tensor
+            The initial state x(t=0) (observed samples). 
+            Note this is assumed to be normalized by the shift and scale.
             Shape: (batch_size, n_covariates)
-
-        atol: float
+        atol : float, optional
             Absolute error tolerance for the ODE solver.
-
-        rtol: float
+        rtol : float, optional
             Relative error tolerance for the ODE solver.
-
-        method: str
-            The ODE solver method to use.
-
-        epsilon: float
-            The time epsilon for the ODE solver.
-
-        options: dict
+        method : str, optional
+            The ODE solver method to use. Must be a valid `torchdiffeq` option.
+        options : dict, optional
             Additional options for the ODE solver.
-
-        adjoint: bool
+        adjoint : bool, optional
             Whether to use the adjoint ODE solver.
+
+        Returns
+        -------
+        xT : torch.Tensor
+            State x(t=T), i.e., samples from the base density.
+        lp : torch.Tensor
+            Log probabilities of input samples x(t=0).
         """
 
         # pull out the shapes
@@ -301,7 +381,7 @@ class ODEFlow(nn.Module):
                 options=options,
             )
 
-        return state[0][1, ...], state[1][1, ...]  # samples y_T, log jacobian
+        return state[0][1, ...], state[1][1, ...]  # samples x(t=T), log jacobian
 
     def log_prob(
         self,
@@ -314,15 +394,27 @@ class ODEFlow(nn.Module):
     ):
         """
         Computes the log probability of the input samples under the ODE flow.
-        Args:
-            x (torch.Tensor): Input samples.
-            atol (float): Absolute tolerance for the ODE solver.
-            rtol (float): Relative tolerance for the ODE solver.
-            method (str): ODE solver method.
-            options (dict): Additional options for the ODE solver.
-            adjoint (bool): Whether to use the adjoint ODE solver.
-        Returns:
-            log_prob (torch.Tensor): Log probability of the input samples.
+        This includes the correction for the probabilities under the base density.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input samples, x(t=0).
+        atol : float, optional
+            Absolute tolerance for the ODE solver.
+        rtol : float, optional
+            Relative tolerance for the ODE solver.
+        method : str, optional
+            ODE solver method. Must be a valid `torchdiffeq` option.
+        options : dict, optional
+            Additional options for the ODE solver.
+        adjoint : bool, optional
+            Whether to use the adjoint ODE solver.
+
+        Returns
+        -------
+        log_prob : torch.Tensor
+            Log probability of the input samples.
         """
 
         # shift and scale the target
@@ -348,10 +440,34 @@ class ODEFlow(nn.Module):
 
 class ConditionalODEFlow(nn.Module):
     """
-    Conditional ODE Flow model.
-    This class implements a conditional ODE flow using a neural network to model the dynamics.
-    It includes methods for computing the dynamics, sampling, and calculating the flow matching loss.
-    Note we define the ODE transform from a base unit normal (at t=T) to a target distribution (at t=0), ie., the forward transform integrates backwards in time, consistent with diffusion models.
+    This class implements a conditional ODE flow using a neural network to model
+    the dynamics. It includes methods for computing the dynamics, sampling, 
+    and calculating the flow matching loss.
+
+    Note that we define the ODE transform from a base unit normal (at t=T) to a target
+    distribution (at t=0), i.e., the forward transform integrates backwards in time,
+    consistent with diffusion models.
+
+    Attributes
+    ----------
+    target_dimension : int
+        Dimension of the target distribution.
+    conditional_dimension : int
+        Dimension of the conditional inputs.
+    layers : torch.nn.ModuleList
+        List of neural network layers.
+    velocity : torch.nn.Sequential
+        Model for the dynamics of the flow.
+    target_shift : torch.Tensor
+        Shift to be applied to the target distribution.
+    target_scale : torch.Tensor
+        Scale to be applied to the target distribution.
+    conditional_shift : torch.Tensor
+        Shift to be applied to the conditional inputs.
+    conditional_scale : torch.Tensor
+        Scale to be applied to the conditional inputs.
+    twopi : torch.Tensor
+        Tensor containing 2*pi.
     """
 
     def __init__(
@@ -365,6 +481,26 @@ class ConditionalODEFlow(nn.Module):
         conditional_shift: Optional[torch.Tensor] = None,
         conditional_scale: Optional[torch.Tensor] = None,
     ):
+        """
+        Parameters
+        ----------
+        target_dimension : int, optional
+            Dimension of the target distribution.
+        conditional_dimension : int, optional
+            Dimension of the conditional inputs.
+        hidden_units : list of int, optional
+            Number of hidden units per layer in the dynamics network.
+        activation : torch.nn.Module, optional
+            Activation function.
+        target_shift : torch.Tensor, optional
+            Shift to be applied to the target distribution.
+        target_scale : torch.Tensor, optional
+            Scale to be applied to the target distribution.
+        conditional_shift : torch.Tensor, optional
+            Shift to be applied to the conditional inputs.
+        conditional_scale : torch.Tensor, optional
+            Scale to be applied to the conditional inputs.
+        """
         super().__init__()
 
         # make a module list of layers
@@ -416,16 +552,25 @@ class ConditionalODEFlow(nn.Module):
 
     def dynamics(self, t: torch.Tensor, states: Tuple[torch.Tensor, torch.Tensor]):
         """
-        Computes the dynamics of the ODE flow.
+        Computes the dynamics, dx/dt,of the ODE flow.
 
-        Args:
-            t (torch.Tensor): Time tensor.
-            states (tuple): Tuple containing the current state and conditional inputs.
-                - states[0] (torch.Tensor): Current state (x). Note that x here is assumed to be normalized by the shift and scale.
-                - states[1] (torch.Tensor): Conditional inputs. Note these get normalized inside the function.
-        Returns:
-            dxdt (torch.Tensor): The velocity field.
-            torch.zeros_like(conditional): Zero gradient for the conditionals.
+        Parameters
+        ----------
+        t : torch.Tensor
+            Time tensor.
+        states : tuple of torch.Tensor
+            Tuple containing the current state and conditional inputs.
+            Current state (x) is assumed to be in `states[0]`. 
+            Conditional inputs are assumed to be in `states[1]`.
+            Note that x here is assumed to be normalized by the shift and scale.
+            Note that the conditionals get normalized inside the function.
+
+        Returns
+        -------
+        dxdt : torch.Tensor
+            The velocity field.
+        zeros : torch.Tensor
+            Zero gradient for the conditionals.
         """
 
         # extract states
@@ -454,19 +599,30 @@ class ConditionalODEFlow(nn.Module):
         self, t: torch.Tensor, states: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
     ):
         """
-        Computes the dynamics of the ODE flow and the log determinant of the Jacobian.
-        Args:
-            t (torch.Tensor): Time tensor.
-            states (tuple): Tuple containing the current state, conditional inputs, and log Jacobian.
-                - states[0] (torch.Tensor): Current state (x). Note that x here is assumed to be normalized by the shift and scale.
-                - states[1] (torch.Tensor): Conditional inputs. Note these get normalized inside the dynamics function.
-                - states[2] (torch.Tensor): Log determinant of the Jacobian.
-        Returns:
-            dxdt (torch.Tensor): The velocity field.
-            torch.zeros_like(conditional): Zero gradient for the conditionals.
-            divergence (torch.Tensor): Divergence of the velocity field.
-        """
+        Computes the dynamics, dx/dt, of the ODE flow
+        and the log determinant of the Jacobian, dp(x)/dt.
 
+        Parameters
+        ----------
+        t : torch.Tensor
+            Time tensor.
+        states : tuple of torch.Tensor
+            Tuple containing the current state, conditional inputs, and log Jacobian.
+            Current state (x) is assumed to be in `states[0]`. 
+            Conditional inputs are assumed to be in `states[1]`.
+            Log Jacobian assumed to be in `states[2]`.
+            Note that x here is assumed to be normalized by the shift and scale.
+            Note that the conditionals get normalized inside the function.
+        
+        Returns
+        -------
+        dxdt : torch.Tensor
+            The velocity field.
+        zeros : torch.Tensor
+            Zero gradient for the conditionals.
+        divergence : torch.Tensor
+            Divergence of the velocity field.
+        """
         # pull out the x, conditional, jacobian
         x, conditional, log_jacobian = states
 
@@ -498,14 +654,23 @@ class ConditionalODEFlow(nn.Module):
     # for the ODE solver: velocity field
     def forward(self, t: torch.Tensor, states: Tuple[torch.Tensor, torch.Tensor]):
         """
-        Computes the forward pass of the ODE flow.
-        Args:
-            t (torch.Tensor): Time tensor.
-            states (tuple): Tuple containing the current state and conditional inputs.
-                - states[0] (torch.Tensor): Current state (x).
-                - states[1] (torch.Tensor): Conditional inputs.
-        Returns:
-            dxdt (torch.Tensor): The velocity field.
+        Computes the forward pass of the conditional ODE flow.
+        
+        Parameters
+        ----------
+        t : torch.Tensor
+            Time tensor.
+        states : tuple of torch.Tensor
+            Tuple containing the current state and conditional inputs.
+            Current state (x) is assumed to be in `states[0]`. 
+            Conditional inputs are assumed to be in `states[1]`.
+            Note that x here is assumed to be normalized by the shift and scale.
+            Note that the conditionals get normalized inside the function.
+        
+        Returns
+        -------
+        dxdt : torch.Tensor
+            The velocity field.
         """
 
         return self.dynamics(t, states)
@@ -519,13 +684,21 @@ class ConditionalODEFlow(nn.Module):
     ):
         """
         Computes the ideal linear velocity field for the ODE flow.
-        Args:
-            x0 (torch.Tensor): Initial state (observed samples).
-            xT (torch.Tensor): Final state (base density).
-            t (torch.Tensor): Time tensor.
-        Returns:
-            xt (torch.Tensor): Interpolated state.
-            v_hat (torch.Tensor): Ideal velocity (dx/dt).
+
+        Parameters
+        ----------
+        x0 : torch.Tensor
+            Initial state at t=0 (observed samples).
+        xT : torch.Tensor
+            Final state at t=T (base density).
+        t : torch.Tensor
+            Time tensor.
+        Returns
+        -------
+        xt : torch.Tensor
+            Interpolated state at times t.
+        v_hat : torch.Tensor
+            Ideal velocity (dx/dt).
         """
 
         # shift the target samples. Note that the model learns the dynamics for the normalized variable (via target shift and scale)
@@ -537,17 +710,23 @@ class ConditionalODEFlow(nn.Module):
 
     def flow_matching_loss(
         self,
-        x: torch.Tensor,  # initial state (observed samples)
-        conditional: torch.Tensor,  # conditional inputs
+        x: torch.Tensor,
+        conditional: torch.Tensor,
     ):
         """
         Computes the flow matching loss for the ODE flow.
 
-        Args:
-            x (torch.Tensor): Initial state (observed samples).
-            conditional (torch.Tensor): Conditional inputs.
-        Returns:
-            loss (torch.Tensor): Flow matching loss.
+        Parameters
+        ----------
+        x : torch.Tensor
+            Initial state at t=0 (observed samples).
+        conditional : torch.Tensor
+            Conditional inputs.
+        
+        Returns
+        -------
+        loss : torch.Tensor
+            Flow matching loss.
         """
 
         # base samples
@@ -575,16 +754,23 @@ class ConditionalODEFlow(nn.Module):
         gradients: bool = False,
     ):
         """
-        This function transforms base samples to the target under the ODE flow via odeint, by integrating backwards in time from T=1 to 0.
+        This function transforms base samples to the target under the ODE flow
+        via odeint, by integrating backwards in time from t=T to t=0.
 
-        Args:
-            xT (torch.Tensor): Final state (base density).
-            conditional (torch.Tensor): Conditional inputs.
-            gradients (bool): Whether to compute in a no_grad() context.
-        Returns:
-            x0 (torch.Tensor): Transformed samples.
+        Parameters
+        ----------
+        xT : torch.Tensor
+            Final state at t=T (base density).
+        conditional : torch.Tensor
+            Conditional inputs.
+        gradients : bool, optional
+            Whether to compute in a `torch.no_grad()` context.
+
+        Returns
+        -------
+        x0 : torch.Tensor 
+            Transformed samples from target density at t=0.
         """
-
         # integration times (note: solving backwards in time)
         integration_times = torch.tensor([1.0, 0.0]).to(xT.device)
 
@@ -623,34 +809,36 @@ class ConditionalODEFlow(nn.Module):
         adjoint: bool = False,
     ):
         """
-        This solves the pair of ODEs forward in time (0 (target) -> T (base)) to find the base x(t=T) samples and log probabilities associated with some input x(t=0) samples.
+        This solves the pair of ODEs forward in time (t=0 (target) -> t=T (base))
+        to find the base x(t=T) samples and log probabilities associated with 
+        some input x(t=0) samples given the conditional inputs.
 
-        Args:
-        x: torch.Tensor
-            The initial state x_0 (observed samples). Note this is assumed to be normalized by the shift and scale.
+        Parameters
+        ----------
+        x : torch.Tensor
+            The initial state x(t=0) (observed samples). 
+            Note this is assumed to be normalized by the shift and scale.
             Shape: (batch_size, n_covariates)
-
-        conditionals: torch.Tensor
-            Conditional inputs to the ODE flow.
-            Shape: (batch_size, n_covariates)
-
-        atol: float
+        conditional : torch.Tensor
+            Conditional inputs.
+            Shape: (batch_size, n_conditionals)
+        atol : float, optional
             Absolute error tolerance for the ODE solver.
-
-        rtol: float
+        rtol : float, optional
             Relative error tolerance for the ODE solver.
-
-        method: str
-            The ODE solver method to use.
-
-        epsilon: float
-            The time epsilon for the ODE solver.
-
-        options: dict
+        method : str, optional
+            The ODE solver method to use. Must be a valid `torchdiffeq` option.
+        options : dict, optional
             Additional options for the ODE solver.
-
-        adjoint: bool
+        adjoint : bool, optional
             Whether to use the adjoint ODE solver.
+
+        Returns
+        -------
+        xT : torch.Tensor
+            State x(t=T), i.e., samples from the base density.
+        lp : torch.Tensor
+            Log probabilities of input samples x(t=0).
         """
 
         # pull out the shapes
@@ -705,17 +893,30 @@ class ConditionalODEFlow(nn.Module):
         adjoint: bool = False,
     ):
         """
-        Computes the log probability of the input samples under the ODE flow.
-        Args:
-            x (torch.Tensor): Input samples.
-            conditional (torch.Tensor): Conditional inputs.
-            atol (float): Absolute tolerance for the ODE solver.
-            rtol (float): Relative tolerance for the ODE solver.
-            method (str): ODE solver method.
-            options (dict): Additional options for the ODE solver.
-            adjoint (bool): Whether to use the adjoint ODE solver.
-        Returns:
-            log_prob (torch.Tensor): Log probability of the input samples.
+        Computes the conditional log probability of the input samples under the ODE flow.
+        This includes the correction for the probabilities under the base density.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input samples, x(t=0).
+        conditional : torch.Tensor
+            Conditional inputs.
+        atol : float, optional
+            Absolute tolerance for the ODE solver.
+        rtol : float, optional
+            Relative tolerance for the ODE solver.
+        method : str, optional
+            ODE solver method. Must be a valid `torchdiffeq` option.
+        options : dict, optional
+            Additional options for the ODE solver.
+        adjoint : bool, optional
+            Whether to use the adjoint ODE solver.
+
+        Returns
+        -------
+        log_prob : torch.Tensor
+            Log probability of the input samples.
         """
 
         # shift the inputs
