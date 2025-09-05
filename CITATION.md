@@ -12,7 +12,7 @@ We would also encourage users to acknowledge the theoretical works that our code
 ```latex
 \texttt{flowfusion.diffusion} \citep{chen18, song21_iclr, song21_neurips};
 \texttt{flowfusion.flow} \citep{lipman23};
-\texttt{flowfusion.symplectic_flow} \citep{toth23, holderrieth24}.
+\texttt{flowfusion.symplectic_flow} \citep{toth20}.
 ```
 
 BibTeX entries for all of these references are included below, based on NASA ADS and DBLP.
@@ -79,23 +79,6 @@ archivePrefix = {arXiv},
  primaryClass = {cs.MS},
        adsurl = {https://ui.adsabs.harvard.edu/abs/2020Natur.585..357H},
       adsnote = {Provided by the SAO/NASA Astrophysics Data System}
-}
-
-@INPROCEEDINGS{holderrieth24,
-       author = {{Holderrieth}, Peter and {Xu}, Yilun and {Jaakkola}, Tommi},
-        title = "{Hamiltonian Score Matching and Generative Flows}",
-         year = 2024,
-archivePrefix = {arXiv},
-       eprint = {2410.20470},
- primaryClass = {cs.LG},
-       adsurl = {https://ui.adsabs.harvard.edu/abs/2024arXiv241020470H},
-      adsnote = {Provided by the SAO/NASA Astrophysics Data System},
-       editor = {A. Globerson and L. Mackey and D. Belgrave and A. Fan and U. Paquet and J. Tomczak and C. Zhang},
-    booktitle = {Advances in Neural Information Processing Systems},
-       volume = {37},
-        pages = {110464--110493},
-    publisher = {Curran Associates, Inc.},
-          url = {https://proceedings.neurips.cc/paper_files/paper/2024/file/c735853cfb9003002db68cdacb1b6e1b-Paper-Conference.pdf}
 }
 
 @INPROCEEDINGS{lipman23,
