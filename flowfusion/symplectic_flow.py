@@ -12,8 +12,31 @@ class SymplecticMLP(nn.Module):
     """
     A specialized network that directly outputs a divergence-free velocity field
     by parameterizing the dynamics of position (q) and momentum (p) separately.
+
+    Attributes
+    ----------
+    mlp_q_dynamics : torch.nn.Sequential
+        Network for position dynamics.
+    mlp_p_dynamics : torch.nn.Sequential
+        Network for momentum dynamics.
+    W : torch.Tensor
+        Weights for time embedding.
     """
     def __init__(self, n_data_dims, n_conditionals, embedding_dimensions, units, activation=nn.SiLU()):
+        """
+        Parameters
+        ----------
+        n_data_dims : int
+            Dimension of inputs.
+        n_conditionals : int
+            Dimension of conditionals.
+        embedding_dimensions : int
+            Dimension of time embedding.
+        units : list of int
+            Number of hidden units per layer.
+        activation : torch.nn.Module, optional
+            Activation function.
+        """
         super().__init__()
         
         input_dim = n_data_dims + n_conditionals + embedding_dimensions
@@ -26,6 +49,25 @@ class SymplecticMLP(nn.Module):
         self.register_buffer("W", torch.randn(embedding_dimensions // 2) * 16.0)
 
     def _create_mlp(self, input_dim, output_dim, units, activation):
+        """
+        Initialises an MLP for modelling dynamics.
+
+        Parameters
+        ----------
+        input_dim : int
+            Dimension of inputs.
+        output_dim : int
+            Dimension of outputs.
+        units : list of int
+            Number of hidden units per layer.
+        activation : torch.nn.Module
+            Activation function.
+
+        Returns
+        -------
+        mlp : torch.nn.Sequential
+            MLP.
+        """
         layers = []
         current_dims = input_dim
         for unit_count in units:
@@ -36,6 +78,24 @@ class SymplecticMLP(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, t, state, conditional):
+        """
+        Evaluates Hamiltonian dynamics, (dq/dt, dp/dt).
+
+        Parameters
+        ----------
+        t : torch.Tensor
+            Time tensor.
+        state : torch.Tensor
+            Position and momentum.
+        conditional : torch.Tensor
+            Conditional inputs.
+
+        Returns
+        -------
+        v : torch.Tensor
+            First half, position dynamics, dq/dt = dH/dp
+            Second half, momentum dynamics, dp/dt = -dH/dq
+        """
         q, p = torch.chunk(state, 2, dim=-1)
         
         if t.dim() == 0:
@@ -66,8 +126,35 @@ class SymplecticFlowModel(nn.Module):
     """
     The main model class. It uses a SymplecticMLP to define its dynamics,
     guaranteeing a fast sampler and enabling a fast, exact log_prob.
+
+    Attributes
+    ----------
+    model : flowfusion.symplectic_flow.SymplecticMLP
+        MLPs for the dynamics.
+    shift : torch.Tensor
+        Input shift.
+    scale : torch.Tensor
+        Input scale.
+    conditional_shift : torch.Tnsor
+        Conditional shift.
+    conditional_scale : torch.Tensor
+        Conditional scale.
     """
     def __init__(self, model, shift, scale, conditional_shift, conditional_scale):
+        """
+        Parameters
+        ----------
+        model : flowfusion.symplectic_flow.SymplecticMLP
+            MLPs for the dynamics.
+        shift : torch.Tensor
+            Input shift.
+        scale : torch.Tensor
+            Input scale.
+        conditional_shift : torch.Tnsor
+            Conditional shift.
+        conditional_scale : torch.Tensor
+            Conditional scale.
+        """
         super().__init__()
         self.model = model
         self.register_buffer("shift", shift)
@@ -77,6 +164,23 @@ class SymplecticFlowModel(nn.Module):
     
     @torch.no_grad()
     def sample(self, shape, conditional=None, num_steps=1):
+        """
+        Generate samples from the symplectic flow.
+
+        Parameters
+        ----------
+        shape : tuple
+            Desired sample shape to generate.
+        conditional : torch.Tensor, optional
+            Conditional inputs.
+        num_steps : int, optional
+            Number of time steps to use when integrating the flow.
+
+        Returns
+        -------
+        x0_final : torch.Tensor
+            Samples from the target distribution, given `conditional`.
+        """
         device = next(self.model.parameters()).device
         # Start with random noise for both position and momentum
         x = torch.randn(shape[0], shape[1] * 2, device=device)
@@ -98,6 +202,25 @@ class SymplecticFlowModel(nn.Module):
 
     @torch.no_grad()
     def log_prob(self, x, conditional=None, atol=1e-5, rtol=1e-5):
+        """
+        Compute the log probability of samples from the target.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Samples from the target distribution.
+        conditional : torch.Tensor, optional
+            Conditional inputs.
+        atol : float, optional
+            Absolute error tolerance for ODE solver.
+        rtol : float, optional
+            Relative error tolerance for ODE solver.
+
+        Returns
+        -------
+        log_p_x : torch.Tensor
+            Log probability of `x` given `conditional`.
+        """
         device = x.device
         q0 = (x - self.shift) / self.scale
         if conditional is not None:
@@ -131,6 +254,19 @@ class SymplecticFlowModel(nn.Module):
         return log_p_x
 
 def create_symplectic_flow_model(pretrained_diffusion_model):
+    """
+    Build a symplectic flow model from an exisiting diffusion model.
+
+    Parameters
+    ----------
+    pretrained_diffusion_model : flowfusion.diffusion.ScoreModel
+        Exisiting, trained, diffusion model.
+
+    Returns
+    -------
+    model : flowfusion.symplectic_flow.SymplecticFlowModel
+        Symplectic flow based on `pretrained_diffusion_model`.
+    """
     teacher_mlp = pretrained_diffusion_model.model
     n_data_dims = teacher_mlp.n_dimensions
     n_conditionals = teacher_mlp.n_conditionals
