@@ -38,4 +38,3 @@ For the mathematical underpinnings of the different modules within the code, ple
 
 ### `flowfusion.symplectic_flow` and `flowfusion.train_symplectic`
 - P. Toth et al. (2020). ICLR 2020. [arXiv:1909.13789](https://arxiv.org/abs/1909.13789)
-- P. Holderrieth, Y. Xu, & T. Jaakkola (2024). NeurIPS 2024. [arXiv:2410.20470](https://arxiv.org/abs/2410.20470)
