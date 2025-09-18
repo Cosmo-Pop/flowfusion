@@ -36,5 +36,5 @@ For the mathematical underpinnings of the different modules within the code, ple
 ### `flowfusion.flow`
 - Y. Lipman et al. (2023). ICLR 2023. [arXiv:2210.02747](https://arxiv.org/abs/2210.02747)
 
-### `flowfusion.symplectic_flow` and `flowfusion.train_symplectic`
+### `flowfusion.symplectic`
 - P. Toth et al. (2020). ICLR 2020. [arXiv:1909.13789](https://arxiv.org/abs/1909.13789)
