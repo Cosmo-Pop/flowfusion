@@ -12,7 +12,7 @@ We would also encourage users to acknowledge the theoretical works that our code
 ```latex
 \texttt{flowfusion.diffusion} \citep{chen18, song21_iclr, song21_neurips};
 \texttt{flowfusion.flow} \citep{lipman23};
-\texttt{flowfusion.symplectic_flow} \citep{toth20}.
+\texttt{flowfusion.symplectic} \citep{toth20}.
 ```
 
 BibTeX entries for all of these references are included below, based on NASA ADS and DBLP.
