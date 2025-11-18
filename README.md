@@ -5,7 +5,7 @@
 
 Generative modelling and density estimation using diffusion models and flow-matching.
 
-The code in this repository was developed as part of Alsing et al. ([2024](https://ui.adsabs.harvard.edu/abs/2024ApJS..274...12A/abstract)), and Thorp et al. ([2024](https://ui.adsabs.harvard.edu/abs/2024ApJ...975..145T/abstract), [2025](https://ui.adsabs.harvard.edu/abs/2025arXiv250612122T/abstract)). In lieu of a more specific reference, please cite those papers if you make use of the code included here. Please also cite the papers associated with any dependencies of the code, particularly Chen et al. ([2018](https://ui.adsabs.harvard.edu/abs/2018arXiv180607366C/abstract)), which describes `torchdiffeq`.
+The code in this repository was developed as part of Alsing et al. ([2024](https://ui.adsabs.harvard.edu/abs/2024ApJS..274...12A/abstract)), and Thorp et al. ([2024](https://ui.adsabs.harvard.edu/abs/2024ApJ...975..145T/abstract), [2025](https://ui.adsabs.harvard.edu/abs/2025ApJ...993..240T/abstract)). In lieu of a more specific reference, please cite those papers if you make use of the code included here. Please also cite the papers associated with any dependencies of the code, particularly Chen et al. ([2018](https://ui.adsabs.harvard.edu/abs/2018arXiv180607366C/abstract)), which describes `torchdiffeq`.
 
 # Installation
 To install the code, please clone this repo:
@@ -25,7 +25,7 @@ import flowfusion
 The code in this repository was developed and applied in the following papers:
 - J. Alsing et al. (2024). ApJS 274, 12. [arXiv:2402.00935](https://arxiv.org/abs/2402.00935)
 - S. Thorp et al. (2024). ApJ 975, 145. [arXiv:2406.19437](https://arxiv.org/abs/2406.19437)
-- S. Thorp et al. (2025). ApJ, submitted. [arXiv:2506.12122](https://arxiv.org/abs/2506.12122)
+- S. Thorp et al. (2025). ApJ, 993, 240. [arXiv:2506.12122](https://arxiv.org/abs/2506.12122)
 
 For the mathematical underpinnings of the different modules within the code, please see (and consider citing) the following references, which our implementations largely follow:
 ### `flowfusion.diffusion`
