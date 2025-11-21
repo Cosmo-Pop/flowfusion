@@ -16,6 +16,11 @@ Then move into the top level directory and run:
 ```bash
   pip install .
 ```
+To install `flowfusion` without updating the dependencies:
+```bash
+pip install poetry
+poetry install --no-update
+```
 This will obtain any dependencies and will install the code, which can then be imported in Python by doing:
 ```python
 import flowfusion
