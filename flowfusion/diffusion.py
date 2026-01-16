@@ -143,10 +143,24 @@ class ScoreModel(torch.nn.Module):
     hutch : bool
         Internal variable to track whether the Skilling--Hutchinson trace estimator is 
         used in `solve_odes_forward`.
+    hutchpp : bool
+        Internal variable to track whether the Hutch++ trace estimator is used in `solve_odes_forward`.
+    hpp_rank : int
+        Rank for QR decomposition in Hutch++ estimator.
+    hpp_vector : int
+        Number of vectors for Hutch++ estimator.
     """
 
     def __init__(
-        self, model=None, sde=None, conditional=None, no_sigma=False, hutchinson=False
+        self, 
+        model=None, 
+        sde=None, 
+        conditional=None, 
+        no_sigma=False, 
+        hutchinson=False, 
+        hutchpp=False,
+        hpp_rank = 1, 
+        hpp_vecs = 1
     ):
         """
         Parameters
@@ -163,6 +177,12 @@ class ScoreModel(torch.nn.Module):
         hutchinson : bool, optional
             If `True`, `solve_odes_forward` will be computed using the 
             Skilling--Hutchinson trace estimator.
+        hutchpp : bool, optional
+            If `True`, `solve_odes_forward` will be computed using the Hutch++ trace estimator.
+        hpp_rank : int, optional
+            Rank for QR decomposition in Hutch++ estimator.
+        hpp_vecs : int, optional
+            Number of vectors for Hutch++ estimator.
         """
         super().__init__()
 
@@ -176,6 +196,9 @@ class ScoreModel(torch.nn.Module):
         )
         self.prob = False
         self.hutch = hutchinson  # if True, uses the Hutchinson trace estimator
+        self.hutchpp = hutchpp   # if True, uses the Hutch++ trace estimator
+        self.hpp_rank = hpp_rank # Rank for QR decomposition
+        self.hpp_vector = hpp_vecs # No of vectors for Hutch++
 
     def score(self, t, x, conditional=None):
         """
@@ -250,6 +273,9 @@ class ScoreModel(torch.nn.Module):
         If `self.hutch` is `True`, the Skilling--Hutchinson trace estimator
         will be used to compute dp(x)/dt.
 
+        If `self.hutchpp` is `True', the Hutch++ trace estimator will be used
+        to compute dp(x)/dt.
+
         Parameters
         ----------
         t : torch.Tensor
@@ -283,8 +309,81 @@ class ScoreModel(torch.nn.Module):
 
             # Calculate the time derivative of the log determinant of the Jacobian.
             if self.prob is True:
-                if self.hutch is False:
-                    # Define a helper function to compute the trace of the Jacobian for a single sample.
+                if self.hutch is True:
+
+                    divergence = torch.sum(
+                    torch.autograd.grad(
+                        x_dot, x, self.e, create_graph=True, retain_graph=True
+                    )[0]
+                    * self.e,
+                    dim=1,)
+
+                elif self.hutchpp is True:
+
+                    batchsize = x.shape[0]
+                    x_flat = x.reshape(batchsize, -1)
+                    D = x_flat.shape[1]
+
+                    # r,m (with safety)
+                    r = int(min(self.hpp_rank, D))
+                    m = int(max(1, self.hpp_vector))
+
+                    # Use stored probes if available (sampled once in solve_odes_forward)
+                    S = getattr(self, "S", None)
+                    G = getattr(self, "G", None)
+
+                    # Fallback (e.g., if someone calls forward without solve_odes_forward)
+                    if (S is None) or (S.shape != (r, batchsize, D)):
+                        S = torch.sign(torch.randn(r, batchsize, D, device=x.device, dtype=x.dtype))
+                    if (G is None) or (G.shape != (m, batchsize, D)):
+                        G = torch.sign(torch.randn(m, batchsize, D, device=x.device, dtype=x.dtype))
+
+                    # VJP closure: A v = J^T v where J = d x_dot / d x
+                    # NOTE: we already computed x_dot above; vjp recomputes f once, but that’s usually fine.
+                    def f(x_):
+                        return self.ode_drift(t, x_, conditional=self.conditional)
+
+                    x_dot_vjp, vjp_fn = torch.func.vjp(f, x)  # returns x_dot and a reusable VJP function
+
+                    # keep x_dot consistent with what we return
+                    x_dot = x_dot_vjp
+
+                    def single_vjp(v_flat):
+                        v = v_flat.reshape_as(x)
+                        return vjp_fn(v)[0].reshape(batchsize, D)  # (batch, D)
+
+                    batched_vjp = torch.func.vmap(single_vjp, in_dims=0, out_dims=0)
+
+                    # Y = A S : (r, batch, D) -> (r, batch, D)
+                    Y = batched_vjp(S)
+                    Y = Y.permute(1, 2, 0)  # (batch, D, r)
+
+                    # QR for each batch
+                    Q, _ = torch.linalg.qr(Y, mode="reduced")  # (batch, D, k)
+                    k = Q.shape[2]
+
+                    # low rank trace term: sum_i q_i^T A q_i
+                    Q_transposed = Q.permute(2, 0, 1)   # (k, batch, D)
+                    AQ = batched_vjp(Q_transposed)      # (k, batch, D)
+                    AQ = AQ.permute(1, 2, 0)            # (batch, D, k)
+                    trace_lr = torch.einsum("bdk,bdk->b", Q, AQ)  # (batch,)
+
+                    # residual: u = (I - QQ^T) g for all g
+                    G_perm = G.permute(1, 2, 0)                     # (batch, D, m)
+                    QtG = torch.einsum("bdk,bdm->bkm", Q, G_perm)   # (batch, k, m)
+                    proj = torch.einsum("bdk,bkm->bdm", Q, QtG)     # (batch, D, m)
+                    U = G_perm - proj                                # (batch, D, m)
+
+                    U_transposed = U.permute(2, 0, 1)               # (m, batch, D)
+                    AU = batched_vjp(U_transposed)                  # (m, batch, D)
+                    AU = AU.permute(1, 2, 0)                        # (batch, D, m)
+
+                    trace_res = torch.einsum("bdm,bdm->b", U, AU)    # (batch,)
+
+                    divergence = trace_lr + trace_res / float(m)
+
+                else:
+                     # Define a helper function to compute the trace of the Jacobian for a single sample.
                     def get_trace_of_jacobian(x_sample, cond_sample):
                         # Define the function whose Jacobian we want.
                         def f(x_in):
@@ -304,14 +403,6 @@ class ScoreModel(torch.nn.Module):
                     #Vectorize the helper function over the batch using vmap.
                     in_dims = (0, 0) if self.conditional is not None else (0, None)
                     divergence = torch.vmap(get_trace_of_jacobian, in_dims=in_dims)(x, self.conditional)
-                else:
-                    divergence = torch.sum(
-                        torch.autograd.grad(
-                            x_dot, x, self.e, create_graph=True, retain_graph=True
-                        )[0]
-                        * self.e,
-                        dim=1,
-                    )
 
         if self.prob is True:
             return x_dot, divergence.view(batchsize, 1)
@@ -469,6 +560,11 @@ class ScoreModel(torch.nn.Module):
         If `self.hutch` is `True`, the Skilling--Hutchinson trace estimator will
         be used in the integrand.
 
+        If `self.hutchpp` is `True`, the Hutch++ trace estimator will be
+        used in the integrand. This uses a low-rank approximation via QR 
+        decomposition combined with a residual Hutchinson estimator for 
+        variance reduction.
+
         Parameters
         ----------
         x0_samples : torch.Tensor
@@ -502,6 +598,17 @@ class ScoreModel(torch.nn.Module):
         # sample epsilons for the trace
         if self.hutch is True:
             self.e = torch.sign(torch.randn(x0_samples.shape)).to(x0_samples.device)
+
+        if self.hutchpp is True:
+            batch = x0_samples.shape[0]
+            D = x0_samples.reshape(batch, -1).shape[1]
+
+            r = int(min(self.hpp_rank, D))
+            m = int(max(1, self.hpp_vector))
+
+            # store in shapes vmap-based Hutch++ expects: (r, batch, D) and (m, batch, D)
+            self.S = torch.sign(torch.randn(r, batch, D, device=x0_samples.device, dtype=x0_samples.dtype))
+            self.G = torch.sign(torch.randn(m, batch, D, device=x0_samples.device, dtype=x0_samples.dtype))
 
         # starting value of delta log px
         delta_logpx = torch.zeros(x0_samples.shape[0], 1).to(x0_samples.device)

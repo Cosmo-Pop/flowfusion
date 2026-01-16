@@ -100,7 +100,10 @@ ScoreModel(
     sde=None,
     conditional=None,
     no_sigma=False,
-    hutchinson=False
+    hutchinson=False,
+    hutchpp=False,
+    hpp_rank=1,
+    hpp_vecs=1
 )
 ```
 
@@ -116,6 +119,9 @@ Score-based generative model that learns the score function of any given data di
 | `no_sigma` | `bool` | If `True`, `model` is assumed to return score(x, t, conditional). If `False`, `model` is assumed to return score(x, t, conditional) * sigma(t). |
 | `prob` | `bool` | Internal variable to track whether the trace of the Jacobian is included in the forward call (automatically set/reset when calling `solve_odes_forward`). |
 | `hutch` | `bool` | Internal variable to track whether the Skilling--Hutchinson trace estimator is used in `solve_odes_forward`. |
+| `hutchpp` | `bool` | Internal variable to track whether the Hutch++ trace estimator is used in `solve_odes_forward`. |
+| `hpp_rank` | `int` | Rank for QR decomposition in Hutch++ estimator. |
+| `hpp_vector` | `int` | Number of vectors for Hutch++ estimator. |
 
 <a href="../flowfusion/diffusion.py#L148"><img align="right" style="float:right;" src="https://img.shields.io/badge/-source-cccccc?style=flat-square"></a>
 
@@ -127,7 +133,10 @@ __init__(
     sde=None,
     conditional=None,
     no_sigma=False,
-    hutchinson=False
+    hutchinson=False,
+    hutchpp=False,
+    hpp_rank=1,
+    hpp_vecs=1
 )
 ```
 
@@ -140,6 +149,9 @@ __init__(
 | `conditional` | `torch.Tensor`, optional | `None` | Initial value of conditioning variable (can be updated) |
 | `no_sigma` | `bool`, optional | `False` | If `True`, `model` is assumed to return score(x, t, conditional). If `False`, `model` is assumed to return score(x, t, conditional) * sigma(t). |
 | `hutchinson` | `bool`, optional | `False` | If `True`, `solve_odes_forward` will be computed using the Skilling--Hutchinson trace estimator. |
+| `hutchpp` | `bool`, optional | `False` | If `True`, `solve_odes_forward` will be computed using the Hutch++ trace estimator. |
+| `hpp_rank` | `int`, optional | `1` | Rank for QR decomposition in Hutch++ estimator. |
+| `hpp_vecs` | `int`, optional | `1` | Number of vectors for Hutch++ estimator. |
 
 ---
 
@@ -231,6 +243,8 @@ forward(t, states)
 Compute dx/d, and optionally dp(x)/dt at t. Input to the ODE solver.
 
 If `self.hutch` is `True`, the Skilling--Hutchinson trace estimator will be used to compute dp(x)/dt.
+
+If `self.hutchpp` is `True`, the Hutch++ trace estimator will be used to compute dp(x)/dt.
 
 ### Parameters
 
@@ -340,6 +354,8 @@ This solves the pair of ODEs forward in time to find the base samples, x(t=T), a
 Integrates from t=0 to t=T.
 
 If `self.hutch` is `True`, the Skilling--Hutchinson trace estimator will be used in the integrand.
+
+If `self.hutchpp` is `True`, the Hutch++ trace estimator will be used in the integrand. This uses a low-rank approximation via QR decomposition combined with a residual Hutchinson estimator for variance reduction.
 
 ### Parameters
 
