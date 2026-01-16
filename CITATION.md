@@ -95,6 +95,21 @@ archivePrefix = {arXiv},
       adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
 
+@INPROCEEDINGS{meyer21,
+       author = {{Meyer}, Raphael A. and {Musco}, Cameron and {Musco}, Christopher and {Woodruff}, David P.},
+       editor = {{King}, v. and {Le}, H.V.},
+        title = {Hutch++: Optimal Stochastic Trace Estimation},
+    booktitle = {2021 Symposium on Simplicity in Algorithms (SOSA)},
+        pages = {142-155},
+         year = {2021},
+          doi = {10.1137/1.9781611976496.16}
+archivePrefix = {arXiv},
+       eprint = {2010.09649},
+ primaryClass = {cs.DS},
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2020arXiv201009649M},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+}
+
 @INPROCEEDINGS{paszke19,
        author = {Paszke, Adam and Gross, Sam and Massa, Francisco and Lerer, Adam and Bradbury, James and Chanan, Gregory and Killeen, Trevor and Lin, Zeming and Gimelshein, Natalia and Antiga, Luca and Desmaison, Alban and Kopf, Andreas and Yang, Edward and DeVito, Zachary and Raison, Martin and Tejani, Alykhan and Chilamkurthy, Sasank and Steiner, Benoit and Fang, Lu and Bai, Junjie and Chintala, Soumith},
     booktitle = {Advances in Neural Information Processing Systems},
