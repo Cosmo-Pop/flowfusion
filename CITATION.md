@@ -14,6 +14,11 @@ We would also encourage users to acknowledge the theoretical works that our code
 \texttt{flowfusion.flow} \citep{lipman23};
 \texttt{flowfusion.symplectic} \citep{toth20}.
 ```
+The stochastic trace estimators (Hutchinson and Hutch++) can be cited with the references below.
+```latex
+Hutchinson trace estimator \citep{hutchinson89, skilling89};
+Hutch++ trace estimator \citep{meyer21}.
+```
 
 BibTeX entries for all of these references are included below, based on NASA ADS and DBLP.
 ```bibtex
@@ -81,6 +86,17 @@ archivePrefix = {arXiv},
       adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
 
+@ARTICLE{hutchinson89,
+       author = {Hutchinson, Michael F.},
+        title = {A Stochastic Estimator of the Trace of the Influence Matrix for Laplacian Smoothing Splines},
+      journal = {Communications in Statistics -- Simulation and Computation},
+         year = {1989},
+       volume = {18},
+       number = {3},
+        pages = {1059-1076},
+          url = {10.1080/03610918908812806}
+}
+
 @INPROCEEDINGS{lipman23,
        author = {{Lipman}, Yaron and {Chen}, Ricky T.~Q. and {Ben-Hamu}, Heli and {Nickel}, Maximilian and {Le}, Matt},
         title = "{Flow Matching for Generative Modeling}",
@@ -122,6 +138,19 @@ archivePrefix = {arXiv},
 archivePrefix = {arXiv},
        eprint = {1912.01703},
           url = {https://proceedings.neurips.cc/paper_files/paper/2019/file/bdbca288fee7f92f2bfa9f7012727740-Paper.pdf}
+}
+
+@INPROCEEDINGS{skilling89,
+       author = {{Skilling}, John},
+       editor = {{Skilling}, J.},
+        title = {The Eigenvalues of Mega-dimensional Matrices},
+    booktitle = {Maximum Entropy and Bayesian Methods},
+       series = {Fundamental Theories of Physics},
+         year = {1989},
+    publisher = {Springer},
+        pages = {455-466},
+       volume = {36},
+          doi = {10.1007/978-94-015-7860-8_48}
 }
 
 @INPROCEEDINGS{song21_iclr,
