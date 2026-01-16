@@ -143,11 +143,24 @@ class ScoreModel(torch.nn.Module):
     hutch : bool
         Internal variable to track whether the Skilling--Hutchinson trace estimator is 
         used in `solve_odes_forward`.
+    hutchpp : bool
+        Internal variable to track whether the Hutch++ trace estimator is used in `solve_odes_forward`.
+    hpp_rank : int
+        Rank for QR decomposition in Hutch++ estimator.
+    hpp_vector : int
+        Number of vectors for Hutch++ estimator.
     """
 
     def __init__(
-        self, model=None, sde=None, conditional=None, no_sigma=False, hutchinson=False, hutchpp=False,
-        hpp_rank = 1, hpp_vecs = 1
+        self, 
+        model=None, 
+        sde=None, 
+        conditional=None, 
+        no_sigma=False, 
+        hutchinson=False, 
+        hutchpp=False,
+        hpp_rank = 1, 
+        hpp_vecs = 1
     ):
         """
         Parameters
@@ -164,6 +177,12 @@ class ScoreModel(torch.nn.Module):
         hutchinson : bool, optional
             If `True`, `solve_odes_forward` will be computed using the 
             Skilling--Hutchinson trace estimator.
+        hutchpp : bool, optional
+            If `True`, `solve_odes_forward` will be computed using the Hutch++ trace estimator.
+        hpp_rank : int, optional
+            Rank for QR decomposition in Hutch++ estimator.
+        hpp_vecs : int, optional
+            Number of vectors for Hutch++ estimator.
         """
         super().__init__()
 
@@ -540,6 +559,11 @@ class ScoreModel(torch.nn.Module):
 
         If `self.hutch` is `True`, the Skilling--Hutchinson trace estimator will
         be used in the integrand.
+
+        If `self.hutchpp` is `True`, the Hutch++ trace estimator will be
+        used in the integrand. This uses a low-rank approximation via QR 
+        decomposition combined with a residual Hutchinson estimator for 
+        variance reduction.
 
         Parameters
         ----------
