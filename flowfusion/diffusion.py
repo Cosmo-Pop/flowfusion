@@ -452,7 +452,7 @@ class ScoreModel(torch.nn.Module):
                     # S^T = inv(R)
                     S_transposed = torch.linalg.solve_triangular(R, I, upper=True) # (batch, k, m)
                     # scale by 2-norm of rows
-                    S_transposed = S_transposed / torch.linalg.vector_norm(S_transposed, dim=-1)
+                    S_transposed = S_transposed / torch.linalg.vector_norm(S_transposed, dim=-1, keepdim=True)
                     S = S.permute(0, 2, 1) # (batch, m, k)
 
                     # trace of H
@@ -460,7 +460,7 @@ class ScoreModel(torch.nn.Module):
 
                     # "loop" over probes
                     # matrix with columns of w - s^T w s
-                    X = W - torch.sum(S*W, dim=1)[:,None,:]*S # (batch, k, m)
+                    X = W - torch.sum(S*W, dim=1, keepdim=True)*S # (batch, k, m)
                     # s^T H s for all s for all batches
                     SHS = torch.sum(S*torch.einsum('bim,bmk->bik', H, S), dim=1) # (batch, k)
                     # x^T H x for all x for all batches
