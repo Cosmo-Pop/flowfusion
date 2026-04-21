@@ -453,7 +453,7 @@ class ScoreModel(torch.nn.Module):
                     S_transposed = torch.linalg.solve_triangular(R, I, upper=True) # (batch, k, m)
                     # scale by 2-norm of rows
                     S_transposed = S_transposed / torch.linalg.vector_norm(S_transposed, dim=-1, keepdim=True)
-                    S = S.permute(0, 2, 1) # (batch, m, k)
+                    S = S_transposed.permute(0, 2, 1) # (batch, m, k)
 
                     # trace of H
                     trace_H = torch.diagonal(H, 0, 1, 2).sum(dim=-1) # (batch,)
