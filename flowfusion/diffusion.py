@@ -372,6 +372,7 @@ class ScoreModel(torch.nn.Module):
                     # Y = A S : (r, batch, D) -> (r, batch, D)
                     Y = batched_vjp(S)
                     Y = Y.permute(1, 2, 0)  # (batch, D, r)
+                    Y = Y.detach() #Detach computational graph for QR decomposition
 
                     # QR for each batch
                     Q, _ = torch.linalg.qr(Y, mode="reduced")  # (batch, D, k)
@@ -381,6 +382,7 @@ class ScoreModel(torch.nn.Module):
                     Q_transposed = Q.permute(2, 0, 1)   # (k, batch, D)
                     AQ = batched_vjp(Q_transposed)      # (k, batch, D)
                     AQ = AQ.permute(1, 2, 0)            # (batch, D, k)
+                    AQ = AQ.detach()    #Detach computational graph
                     trace_lr = torch.einsum("bdk,bdk->b", Q, AQ)  # (batch,)
 
                     # residual: u = (I - QQ^T) g for all g
@@ -392,7 +394,7 @@ class ScoreModel(torch.nn.Module):
                     U_transposed = U.permute(2, 0, 1)               # (m, batch, D)
                     AU = batched_vjp(U_transposed)                  # (m, batch, D)
                     AU = AU.permute(1, 2, 0)                        # (batch, D, m)
-
+                    AU = AU.detach() # Detach computational graph
                     trace_res = torch.einsum("bdm,bdm->b", U, AU)    # (batch,)
 
                     divergence = trace_lr + trace_res / float(m)
@@ -433,7 +435,8 @@ class ScoreModel(torch.nn.Module):
                     # Y = A O
                     Y = batched_vjp(O) # (m, batch, D)
                     Y = Y.permute(1, 2, 0)  # (batch, D, m)
-
+                    Y = Y.detach() #Detach computational graph
+                    
                     # QR for each batch
                     Q, R = torch.linalg.qr(Y, mode="reduced") # (batch, D, k) (batch, k, m)
                     k = Q.shape[2] # min(D, m) = m (as m <= D enforced)
@@ -443,6 +446,7 @@ class ScoreModel(torch.nn.Module):
                     Q_transposed = Q.permute(2, 0, 1) # (k, batch, D)
                     AQ = batched_vjp(Q_transposed) # (k, batch, D)
                     AQ = AQ.permute(1, 2, 0) # (batch, D, k)
+                    AQ = AQ.detach() #Detach computational graph
                     # H = Q^T Z # i = k, j = k
                     H = torch.einsum("bdi,bdj->bij", Q, AQ) # (batch, k, k)
                     # W = Q^T O
