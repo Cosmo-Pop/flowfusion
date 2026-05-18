@@ -149,6 +149,10 @@ class ScoreModel(torch.nn.Module):
         Rank for QR decomposition in Hutch++ estimator.
     hpp_vector : int
         Number of vectors for Hutch++ estimator.
+    xtrace : bool
+        Internal variable to track whether the XTrace estimator is used in `solve_odes_forward`.
+    xt_vector : int
+        Number of vectors for XTrace estimator.
     """
 
     def __init__(
@@ -160,7 +164,9 @@ class ScoreModel(torch.nn.Module):
         hutchinson=False, 
         hutchpp=False,
         hpp_rank = 1, 
-        hpp_vecs = 1
+        hpp_vecs = 1,
+        xtrace=False,
+        xt_vecs = 1
     ):
         """
         Parameters
@@ -183,6 +189,10 @@ class ScoreModel(torch.nn.Module):
             Rank for QR decomposition in Hutch++ estimator.
         hpp_vecs : int, optional
             Number of vectors for Hutch++ estimator.
+        xtrace : bool, optional
+            If `True`, `solve_odes_forward` will be computed using the XTrace estimator.
+        xt_vecs : int, optional
+            Number of vectors for XTrace estimator.
         """
         super().__init__()
 
@@ -199,6 +209,8 @@ class ScoreModel(torch.nn.Module):
         self.hutchpp = hutchpp   # if True, uses the Hutch++ trace estimator
         self.hpp_rank = hpp_rank # Rank for QR decomposition
         self.hpp_vector = hpp_vecs # No of vectors for Hutch++
+        self.xtrace = xtrace # if True, uses the XTrace estimator
+        self.xt_vector = xt_vecs # No of vectors for XTrace
 
     def score(self, t, x, conditional=None):
         """
@@ -275,6 +287,9 @@ class ScoreModel(torch.nn.Module):
 
         If `self.hutchpp` is `True', the Hutch++ trace estimator will be used
         to compute dp(x)/dt.
+
+        If `self.xtrace` is `True`, the XTrace estimator will be used to
+        compute dp(x)/dt.
 
         Parameters
         ----------
@@ -357,6 +372,7 @@ class ScoreModel(torch.nn.Module):
                     # Y = A S : (r, batch, D) -> (r, batch, D)
                     Y = batched_vjp(S)
                     Y = Y.permute(1, 2, 0)  # (batch, D, r)
+                    Y = Y.detach() #Detach computational graph for QR decomposition
 
                     # QR for each batch
                     Q, _ = torch.linalg.qr(Y, mode="reduced")  # (batch, D, k)
@@ -366,6 +382,7 @@ class ScoreModel(torch.nn.Module):
                     Q_transposed = Q.permute(2, 0, 1)   # (k, batch, D)
                     AQ = batched_vjp(Q_transposed)      # (k, batch, D)
                     AQ = AQ.permute(1, 2, 0)            # (batch, D, k)
+                    AQ = AQ.detach()    #Detach computational graph
                     trace_lr = torch.einsum("bdk,bdk->b", Q, AQ)  # (batch,)
 
                     # residual: u = (I - QQ^T) g for all g
@@ -377,10 +394,91 @@ class ScoreModel(torch.nn.Module):
                     U_transposed = U.permute(2, 0, 1)               # (m, batch, D)
                     AU = batched_vjp(U_transposed)                  # (m, batch, D)
                     AU = AU.permute(1, 2, 0)                        # (batch, D, m)
-
+                    AU = AU.detach() # Detach computational graph
                     trace_res = torch.einsum("bdm,bdm->b", U, AU)    # (batch,)
 
                     divergence = trace_lr + trace_res / float(m)
+
+                elif self.xtrace is True:
+
+                    batchsize = x.shape[0]
+                    x_flat = x.reshape(batchsize, -1)
+                    D = x_flat.shape[1]
+
+                    # m (with safety)
+                    # require m <= D
+                    m = int(min(max(1, self.xt_vector),D))
+
+                    # Use stored probes if available (sampled once in solve_odes_forward)
+                    O = getattr(self, "O", None)
+
+                    # Fallback (e.g., if someone calls forward without solve_odes_forward)
+                    if (O is None) or (O.shape != (m, batchsize, D)):
+                        O = torch.sign(torch.randn(m, batchsize, D, device=x.device, dtype=x.dtype))
+
+                    # VJP closure: A v = J^T v where J = d x_dot / d x
+                    # NOTE: we already computed x_dot above; vjp recomputes f once, but that’s usually fine.
+                    def f(x_):
+                        return self.ode_drift(t, x_, conditional=self.conditional)
+
+                    x_dot_vjp, vjp_fn = torch.func.vjp(f, x)  # returns x_dot and a reusable VJP function
+
+                    # keep x_dot consistent with what we return
+                    x_dot = x_dot_vjp
+
+                    def single_vjp(v_flat):
+                        v = v_flat.reshape_as(x)
+                        return vjp_fn(v)[0].reshape(batchsize, D)  # (batch, D)
+
+                    batched_vjp = torch.func.vmap(single_vjp, in_dims=0, out_dims=0)
+
+                    # Y = A O
+                    Y = batched_vjp(O) # (m, batch, D)
+                    Y = Y.permute(1, 2, 0)  # (batch, D, m)
+                    Y = Y.detach() #Detach computational graph
+                    
+                    # QR for each batch
+                    Q, R = torch.linalg.qr(Y, mode="reduced") # (batch, D, k) (batch, k, m)
+                    k = Q.shape[2] # min(D, m) = m (as m <= D enforced)
+                    I = torch.eye(k, device=x.device)
+
+                    # Z = A Q
+                    Q_transposed = Q.permute(2, 0, 1) # (k, batch, D)
+                    AQ = batched_vjp(Q_transposed) # (k, batch, D)
+                    AQ = AQ.permute(1, 2, 0) # (batch, D, k)
+                    AQ = AQ.detach() #Detach computational graph
+                    # H = Q^T Z # i = k, j = k
+                    H = torch.einsum("bdi,bdj->bij", Q, AQ) # (batch, k, k)
+                    # W = Q^T O
+                    W = torch.einsum("bdk,mbd->bkm", Q, O)
+                    # T = Z^T O
+                    T = torch.einsum("bdk,mbd->bkm", AQ, O)
+                    # S^T = inv(R)
+                    S_transposed = torch.linalg.solve_triangular(R, I, upper=True) # (batch, k, m)
+                    # scale by 2-norm of rows
+                    S_transposed = S_transposed / torch.linalg.vector_norm(S_transposed, dim=-1, keepdim=True)
+                    S = S_transposed.permute(0, 2, 1) # (batch, m, k)
+
+                    # trace of H
+                    trace_H = torch.diagonal(H, 0, 1, 2).sum(dim=-1) # (batch,)
+
+                    # "loop" over probes
+                    # matrix with columns of w - s^T w s
+                    X = W - torch.sum(S*W, dim=1, keepdim=True)*S # (batch, k, m)
+                    # s^T H s for all s for all batches
+                    SHS = torch.sum(S*torch.einsum('bim,bmk->bik', H, S), dim=1) # (batch, k)
+                    # x^T H x for all x for all batches
+                    XHX = torch.sum(X*torch.einsum('bim,bmk->bik', H, X), dim=1) # (batch, k)
+                    # w^T s for all columns of W and S for all batches
+                    WS = torch.sum(W*S, dim=1) # (batch, k)
+                    # s^T r for all columns of S and R for all batches
+                    SR = torch.sum(S*R, dim=1) # (batch, k)
+                    # t^T x for all columns of T and X for all batches
+                    TX = torch.sum(T*X, dim=1) # (batch, k)
+                    # per probe trace estimate
+                    trace_ests = trace_H[:,None] - SHS + WS*SR - TX + XHX # (batch, k)
+
+                    divergence = torch.mean(trace_ests, dim=1) # batch
 
                 else:
                      # Define a helper function to compute the trace of the Jacobian for a single sample.
@@ -565,6 +663,9 @@ class ScoreModel(torch.nn.Module):
         decomposition combined with a residual Hutchinson estimator for 
         variance reduction.
 
+        If `self.xtrace` is `True`, the XTrace estimator will be used in
+        the integrand.
+
         Parameters
         ----------
         x0_samples : torch.Tensor
@@ -609,6 +710,15 @@ class ScoreModel(torch.nn.Module):
             # store in shapes vmap-based Hutch++ expects: (r, batch, D) and (m, batch, D)
             self.S = torch.sign(torch.randn(r, batch, D, device=x0_samples.device, dtype=x0_samples.dtype))
             self.G = torch.sign(torch.randn(m, batch, D, device=x0_samples.device, dtype=x0_samples.dtype))
+
+        if self.xtrace is True:
+            batch = x0_samples.shape[0]
+            D = x0_samples.reshape(batch, -1).shape[1]
+
+            m = int(max(1, self.xt_vector))
+
+            # store omega vectors
+            self.O = torch.sign(torch.randn(m, batch, D, device=x0_samples.device, dtype=x0_samples.dtype))
 
         # starting value of delta log px
         delta_logpx = torch.zeros(x0_samples.shape[0], 1).to(x0_samples.device)

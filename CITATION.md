@@ -14,19 +14,19 @@ We would also encourage users to acknowledge the theoretical works that our code
 \texttt{flowfusion.flow} \citep{lipman23};
 \texttt{flowfusion.symplectic} \citep{toth20}.
 ```
-The stochastic trace estimators (Hutchinson and Hutch++) can be cited with the references below.
+The stochastic trace estimators (Hutchinson, Hutch++, XTrace) can be cited with the references below.
 ```latex
 Hutchinson trace estimator \citep{hutchinson89, skilling89};
-Hutch++ trace estimator \citep{meyer21}.
+Hutch++ trace estimator \citep{meyer21};
+XTrace estimator \citep{epperly24}.
 ```
 
 BibTeX entries for all of these references are included below, based on NASA ADS and DBLP.
 ```bibtex
 @ARTICLE{alsing24,
        author = {{Alsing}, Justin and {Thorp}, Stephen and {Deger}, Sinan and {Peiris}, Hiranya V. and {Leistedt}, Boris and {Mortlock}, Daniel and {Leja}, Joel},
-        title = "{pop-cosmos: A Comprehensive Picture of the Galaxy Population from COSMOS Data}",
-      journal = {\apjs},
-     keywords = {Galaxy evolution, Galaxy abundances, Galaxy chemical evolution, Cosmological parameters, Cosmology, Redshift surveys, 594, 574, 580, 339, 343, 1378, Astrophysics - Astrophysics of Galaxies, Astrophysics - Cosmology and Nongalactic Astrophysics, Astrophysics - Instrumentation and Methods for Astrophysics},
+        title = {{pop-cosmos}: A Comprehensive Picture of the Galaxy Population from {COSMOS} Data},
+      journal = {Astrophysical Journal Supplement Series},
          year = 2024,
         month = sep,
        volume = {274},
@@ -43,21 +43,24 @@ archivePrefix = {arXiv},
 
 @INPROCEEDINGS{chen18,
        author = {Chen, Ricky T. Q. and Rubanova, Yulia and Bettencourt, Jesse and Duvenaud, David K},
-    booktitle = {Advances in Neural Information Processing Systems},
        editor = {S. Bengio and H. Wallach and H. Larochelle and K. Grauman and N. Cesa-Bianchi and R. Garnett},
+        title = {Neural Ordinary Differential Equations},
+    booktitle = {Advances in Neural Information Processing Systems},
+         year = 2018,
+       volume = {31},
         pages = {6572--6583},
     publisher = {Curran Associates, Inc.},
-        title = {Neural Ordinary Differential Equations},
-       volume = {31},
-         year = {2018},
 archivePrefix = {arXiv},
        eprint = {1806.07366},
+ primaryClass = {cs.LG},
           url = {https://proceedings.neurips.cc/paper_files/paper/2018/file/69386f6bb1dfed68692a24c8686939b9-Paper.pdf}
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2018arXiv180607366C},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
 
 @MISC{dacostaluis24,
        author = {{da Costa-Luis}, Casper and {Larroque}, Stephen Karl and {Altendorf}, Kyle and {Mary}, Hadrien and {richardsheridan} and {Korobov}, Mikhail and {Yorav-Raphael}, Noam and {Ivanov}, Ivan and {Bargull}, Marcel and {Rodrigues}, Nishant and {Shawn} and {Dektyarev}, Mikhail and {G{\'o}rny}, Micha{\l} and {mjstevens777} and {Pagel}, Matthew D. and {Zugnoni}, Martin and {JC} and {CrazyPython} and {Newey}, Charles and {Lee}, Antony and {pgajdos} and {Todd} and {Malmgren}, Staffan and {redbug312} and {Desh}, Orivej and {Nechaev}, Nikolay and {Boyle}, Mike and {Nordlund}, Max and {MapleCCC} and {McCracken}, Jack},
-        title = "{tqdm: A fast, Extensible Progress Bar for Python and CLI}",
+        title = {{tqdm}: A fast, Extensible Progress Bar for {P}ython and {CLI}},
          year = 2024,
         month = nov,
           eid = {10.5281/zenodo.14231923},
@@ -68,11 +71,27 @@ archivePrefix = {arXiv},
       adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
 
+@ARTICLE{epperly24,
+       author = {{Epperly}, Ethan N. and {Tropp}, Joel A. and {Webber}, Robert J.},
+        title = {\textsc{XTrace}: Making the Most of Every Sample in Stochastic Trace Estimation},
+      journal = {SIAM Journal on Matrix Analysis and Applications},
+         year = 2024,
+        month = jan,
+       volume = {45},
+       number = {1},
+        pages = {1–23},
+          doi = {10.1137/23M1548323},
+archivePrefix = {arXiv},
+       eprint = {2301.07825},
+ primaryClass = {math.NA},
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2023arXiv230107825E},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+}
+
 @ARTICLE{harris20,
        author = {{Harris}, Charles R. and {Millman}, K. Jarrod and {van der Walt}, St{\'e}fan J. and {Gommers}, Ralf and {Virtanen}, Pauli and {Cournapeau}, David and {Wieser}, Eric and {Taylor}, Julian and {Berg}, Sebastian and {Smith}, Nathaniel J. and {Kern}, Robert and {Picus}, Matti and {Hoyer}, Stephan and {van Kerkwijk}, Marten H. and {Brett}, Matthew and {Haldane}, Allan and {del R{\'\i}o}, Jaime Fern{\'a}ndez and {Wiebe}, Mark and {Peterson}, Pearu and {G{\'e}rard-Marchant}, Pierre and {Sheppard}, Kevin and {Reddy}, Tyler and {Weckesser}, Warren and {Abbasi}, Hameer and {Gohlke}, Christoph and {Oliphant}, Travis E.},
-        title = "{Array programming with NumPy}",
-      journal = {\nat},
-     keywords = {Computer Science - Mathematical Software, Statistics - Computation},
+        title = {Array programming with {NumPy}},
+      journal = {Nature},
          year = 2020,
         month = sep,
        volume = {585},
@@ -88,21 +107,21 @@ archivePrefix = {arXiv},
 
 @ARTICLE{hutchinson89,
        author = {Hutchinson, Michael F.},
-        title = {A Stochastic Estimator of the Trace of the Influence Matrix for Laplacian Smoothing Splines},
+        title = {A Stochastic Estimator of the Trace of the Influence Matrix for {L}aplacian Smoothing Splines},
       journal = {Communications in Statistics -- Simulation and Computation},
-         year = {1989},
+         year = 1989,
        volume = {18},
        number = {3},
         pages = {1059-1076},
-          url = {10.1080/03610918908812806}
+          doi = {10.1080/03610918908812806}
 }
 
 @INPROCEEDINGS{lipman23,
        author = {{Lipman}, Yaron and {Chen}, Ricky T.~Q. and {Ben-Hamu}, Heli and {Nickel}, Maximilian and {Le}, Matt},
-        title = "{Flow Matching for Generative Modeling}",
+        title = {Flow Matching for Generative Modeling},
     booktitle = {11th International Conference on Learning Representations},
-         year = {2023},
-          eid = {arXiv:2210.02747},
+         year = 2023,
+        month = may,
 archivePrefix = {arXiv},
        eprint = {2210.02747},
  primaryClass = {cs.LG},
@@ -113,11 +132,11 @@ archivePrefix = {arXiv},
 
 @INPROCEEDINGS{meyer21,
        author = {{Meyer}, Raphael A. and {Musco}, Cameron and {Musco}, Christopher and {Woodruff}, David P.},
-       editor = {{King}, v. and {Le}, H.V.},
+       editor = {{King}, V. and {Le}, H.V.},
         title = {Hutch++: Optimal Stochastic Trace Estimation},
     booktitle = {2021 Symposium on Simplicity in Algorithms (SOSA)},
+         year = 2021,
         pages = {142-155},
-         year = {2021},
           doi = {10.1137/1.9781611976496.16}
 archivePrefix = {arXiv},
        eprint = {2010.09649},
@@ -128,37 +147,39 @@ archivePrefix = {arXiv},
 
 @INPROCEEDINGS{paszke19,
        author = {Paszke, Adam and Gross, Sam and Massa, Francisco and Lerer, Adam and Bradbury, James and Chanan, Gregory and Killeen, Trevor and Lin, Zeming and Gimelshein, Natalia and Antiga, Luca and Desmaison, Alban and Kopf, Andreas and Yang, Edward and DeVito, Zachary and Raison, Martin and Tejani, Alykhan and Chilamkurthy, Sasank and Steiner, Benoit and Fang, Lu and Bai, Junjie and Chintala, Soumith},
-    booktitle = {Advances in Neural Information Processing Systems},
        editor = {H. Wallach and H. Larochelle and A. Beygelzimer and F. d\textquotesingle Alch\'{e}-Buc and E. Fox and R. Garnett},
+        title = {{PyTorch}: An Imperative Style, High-Performance Deep Learning Library},
+    booktitle = {Advances in Neural Information Processing Systems},
+         year = 2019,
+       volume = {32},
         pages = {8024--8035},
     publisher = {Curran Associates, Inc.},
-        title = {PyTorch: An Imperative Style, High-Performance Deep Learning Library},
-       volume = {32},
-         year = {2019},
 archivePrefix = {arXiv},
        eprint = {1912.01703},
+ primaryClass = {cs.LG},
           url = {https://proceedings.neurips.cc/paper_files/paper/2019/file/bdbca288fee7f92f2bfa9f7012727740-Paper.pdf}
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2019arXiv191201703P},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
 
 @INPROCEEDINGS{skilling89,
        author = {{Skilling}, John},
        editor = {{Skilling}, J.},
-        title = {The Eigenvalues of Mega-dimensional Matrices},
+        title = {The {E}igenvalues of Mega-dimensional Matrices},
     booktitle = {Maximum Entropy and Bayesian Methods},
        series = {Fundamental Theories of Physics},
-         year = {1989},
-    publisher = {Springer},
-        pages = {455-466},
+         year = 1989,
        volume = {36},
+        pages = {455-466},
+    publisher = {Springer},
           doi = {10.1007/978-94-015-7860-8_48}
 }
 
 @INPROCEEDINGS{song21_iclr,
        author = {{Song}, Yang and {Sohl-Dickstein}, Jascha and {Kingma}, Diederik P. and {Kumar}, Abhishek and {Ermon}, Stefano and {Poole}, Ben},
-        title = "{Score-Based Generative Modeling through Stochastic Differential Equations}",
+        title = {Score-Based Generative Modeling through Stochastic Differential Equations},
     booktitle = {9th International Conference on Learning Representations},
-         year = {2021},
-          eid = {arXiv:2011.13456},
+         year = 2021,
 archivePrefix = {arXiv},
        eprint = {2011.13456},
  primaryClass = {cs.LG},
@@ -169,26 +190,25 @@ archivePrefix = {arXiv},
 
 @INPROCEEDINGS{song21_neurips,
        author = {{Song}, Yang and {Durkan}, Conor and {Murray}, Iain and {Ermon}, Stefano},
-        title = "{Maximum Likelihood Training of Score-Based Diffusion Models}",
+       editor = {Marc'Aurelio Ranzato and Alina Beygelzimer and Yann N. Dauphin and Percy Liang and Jennifer Wortman Vaughan},
+        title = {Maximum Likelihood Training of Score-Based Diffusion Models},
+    booktitle = {Advances in Neural Information Processing Systems},
          year = 2021,
-        month = jan,
+       volume = {34},
+        pages = {1415--1428},
+    publisher = {Curran Associates, Inc.},
 archivePrefix = {arXiv},
        eprint = {2101.09258},
  primaryClass = {stat.ML},
+          url = {https://papers.nips.cc/paper/2021/file/0a9fdbb17feb6ccb7ec405cfb85222c4-Paper.pdf},
        adsurl = {https://ui.adsabs.harvard.edu/abs/2021arXiv210109258S},
       adsnote = {Provided by the SAO/NASA Astrophysics Data System},
-       editor = {Marc'Aurelio Ranzato and Alina Beygelzimer and Yann N. Dauphin and Percy Liang and Jennifer Wortman Vaughan},
-    booktitle = {Advances in Neural Information Processing Systems},
-       volume = {34},
-        pages = {1415--1428},
-          url = {https://papers.nips.cc/paper/2021/file/0a9fdbb17feb6ccb7ec405cfb85222c4-Paper.pdf}
 }
 
 @ARTICLE{thorp24,
        author = {{Thorp}, Stephen and {Alsing}, Justin and {Peiris}, Hiranya V. and {Deger}, Sinan and {Mortlock}, Daniel J. and {Leistedt}, Boris and {Leja}, Joel and {Loureiro}, Arthur},
-        title = "{pop-cosmos: Scaleable Inference of Galaxy Properties and Redshifts with a Data-driven Population Model}",
-      journal = {\apj},
-     keywords = {Astrostatistics techniques, Redshift surveys, Galaxy photometry, Bayesian statistics, Affine invariant, Spectral energy distribution, 1886, 1378, 611, 1900, 1890, 2129, Astrophysics - Cosmology and Nongalactic Astrophysics, Astrophysics - Astrophysics of Galaxies, Astrophysics - Instrumentation and Methods for Astrophysics},
+        title = {{pop-cosmos}: Scaleable Inference of Galaxy Properties and Redshifts with a Data-driven Population Model},
+      journal = {Astrophysical Journal},
          year = 2024,
         month = nov,
        volume = {975},
@@ -205,9 +225,8 @@ archivePrefix = {arXiv},
 
 @ARTICLE{thorp25,
        author = {{Thorp}, Stephen and {Peiris}, Hiranya V. and {Jagwani}, Gurjeet and {Deger}, Sinan and {Alsing}, Justin and {Leistedt}, Boris and {Mortlock}, Daniel J. and {Halder}, Anik and {Leja}, Joel},
-        title = "{pop-cosmos: Insights from Generative Modeling of a Deep, Infrared-selected Galaxy Population}",
-      journal = {\apj},
-     keywords = {Galaxy evolution, Galaxy photometry, Redshift surveys, Astronomy data modeling, Astrostatistics, Spectral energy distribution, 594, 611, 1378, 1859, 1882, 2129},
+        title = {{pop-cosmos}: Insights from Generative Modeling of a Deep, Infrared-selected Galaxy Population},
+      journal = {Astrophysical Journal},
          year = 2025,
         month = nov,
        volume = {993},
@@ -224,14 +243,13 @@ archivePrefix = {arXiv},
 
 @INPROCEEDINGS{toth20,
        author = {{Toth}, Peter and {Jimenez Rezende}, Danilo and {Jaegle}, Andrew and {Racani{\`e}re}, S{\'e}bastien and {Botev}, Aleksandar and {Higgins}, Irina},
-        title = "{Hamiltonian Generative Networks}",
+        title = {Hamiltonian Generative Networks},
     booktitle = {8th International Conference on Learning Representations},
          year = 2020,
-          eid = {arXiv:1909.13789},
 archivePrefix = {arXiv},
        eprint = {1909.13789},
  primaryClass = {cs.LG},
- 		  url = {https://openreview.net/forum?id=HJenn6VFvB},
+          url = {https://openreview.net/forum?id=HJenn6VFvB},
        adsurl = {https://ui.adsabs.harvard.edu/abs/2019arXiv190913789T},
       adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
