@@ -1139,7 +1139,7 @@ class SUBVPSDE(torch.nn.Module):
         beta_min=0.1,
         beta_max=20,
         T=1.0,
-        epsilon=1e-5,
+        epsilon=1e-3,
     ):
         """
         Parameters
@@ -1229,8 +1229,8 @@ class SUBVPSDE(torch.nn.Module):
             * (
                 1.0
                 - torch.exp(
-                    self.beta_min * t
-                    + 0.5 * (self.beta_max - self.beta_min) * t**2 / self.T
+                    - 2 * self.beta_min * t
+                    - (self.beta_max - self.beta_min) * t**2 / self.T
                 )
             )
         ).view(-1, *[1] * len(dims))
