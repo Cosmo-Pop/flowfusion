@@ -26,6 +26,9 @@ This will obtain any dependencies and will install the code, which can then be i
 import flowfusion
 ```
 
+## Usage
+A simple demo notebook showing how to train and work with a diffusion model is included in `demo_diffusion.ipynb`.
+
 ## References
 The code in this repository was developed and applied in the following papers:
 - J. Alsing et al. (2024). ApJS 274, 12. [arXiv:2402.00935](https://arxiv.org/abs/2402.00935)
