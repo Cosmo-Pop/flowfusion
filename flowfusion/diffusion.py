@@ -545,7 +545,6 @@ class ScoreModel(torch.nn.Module):
                 f"Sampling from the prior | t = {t[0].item():.1f} | sigma = {self.sde.sigma(t)[0].item():.1e}"
                 f"| scale ~ {x.max().item():.1e}"
             )
-            t += dt
             if (
                 t[0] < self.sde.epsilon
             ):  # Accounts for numerical error in the way we discretize t.
@@ -557,6 +556,7 @@ class ScoreModel(torch.nn.Module):
             ) ** (1.0 / 2.0)
             x_mean = x + f * dt
             x = x_mean + g * dw
+            t += dt
             if torch.any(torch.isnan(x)):
                 print("Diffusion is not stable, NaN were produced. Stopped sampling.")
                 break
