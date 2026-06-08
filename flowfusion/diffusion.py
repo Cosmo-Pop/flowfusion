@@ -143,6 +143,8 @@ class ScoreModel(torch.nn.Module):
     hutch : bool
         Internal variable to track whether the Skilling--Hutchinson trace estimator is 
         used in `solve_odes_forward`.
+    hutch_vector : int
+        Number of probe vectors for Skilling--Hutchinson trace estimator.
     hutchpp : bool
         Internal variable to track whether the Hutch++ trace estimator is used in `solve_odes_forward`.
     hpp_rank : int
@@ -161,7 +163,8 @@ class ScoreModel(torch.nn.Module):
         sde=None, 
         conditional=None, 
         no_sigma=False, 
-        hutchinson=False, 
+        hutchinson=False,
+        hutchinson_vecs=1, 
         hutchpp=False,
         hpp_rank = 1, 
         hpp_vecs = 1,
@@ -183,6 +186,8 @@ class ScoreModel(torch.nn.Module):
         hutchinson : bool, optional
             If `True`, `solve_odes_forward` will be computed using the 
             Skilling--Hutchinson trace estimator.
+        hutchinson_vecs : int, optional
+            Number of probe vectors for Skilling--Hutchinson trace estimator.
         hutchpp : bool, optional
             If `True`, `solve_odes_forward` will be computed using the Hutch++ trace estimator.
         hpp_rank : int, optional
@@ -206,6 +211,7 @@ class ScoreModel(torch.nn.Module):
         )
         self.prob = False
         self.hutch = hutchinson  # if True, uses the Hutchinson trace estimator
+        self.hutch_vector = hutchinson_vecs # No of vectors for Skilling--Hutchinson
         self.hutchpp = hutchpp   # if True, uses the Hutch++ trace estimator
         self.hpp_rank = hpp_rank # Rank for QR decomposition
         self.hpp_vector = hpp_vecs # No of vectors for Hutch++
@@ -326,12 +332,38 @@ class ScoreModel(torch.nn.Module):
             if self.prob is True:
                 if self.hutch is True:
 
-                    divergence = torch.sum(
-                    torch.autograd.grad(
-                        x_dot, x, self.e, create_graph=True, retain_graph=True
-                    )[0]
-                    * self.e,
-                    dim=1,)
+                    batchsize = x.shape[0]
+                    x_flat = x.reshape(batchsize, -1)
+                    D = x_flat.shape[1]
+
+                    # m (with safety)
+                    m = int(max(1, self.hpp_vector))
+
+                    # Use stored probes if available (sampled once in solve_odes_forward)
+                    e = getattr(self, "e", None)
+
+                    # Fallback (e.g., if someone calls forward without solve_odes_forward)
+                    if (e is None) or (e.shape != (m, batchsize, D)):
+                        e = torch.sign(torch.randn(m, batchsize, D, device=x.device, dtype=x.dtype))
+
+                    # VJP closure: A v = J^T v where J = d x_dot / d x
+                    # NOTE: we already computed x_dot above; vjp recomputes f once, but that’s usually fine.
+                    def f(x_):
+                        return self.ode_drift(t, x_, conditional=self.conditional)
+
+                    x_dot_vjp, vjp_fn = torch.func.vjp(f, x)  # returns x_dot and a reusable VJP function
+
+                    # keep x_dot consistent with what we return
+                    x_dot = x_dot_vjp
+
+                    def single_vjp(v_flat):
+                        v = v_flat.reshape_as(x)
+                        return vjp_fn(v)[0].reshape(batchsize, D)  # (batch, D)
+
+                    batched_vjp = torch.func.vmap(single_vjp, in_dims=0, out_dims=0)
+
+                    # e^T A e : (m, batch, D)
+                    divergence = torch.mean(torch.sum(batched_vjp(e) * self.e, dim=2), dim=0)
 
                 elif self.hutchpp is True:
 
@@ -696,9 +728,14 @@ class ScoreModel(torch.nn.Module):
         # set prob to True
         self.prob = True
 
-        # sample epsilons for the trace
+        # sample probe vectors for the trace estimator
         if self.hutch is True:
-            self.e = torch.sign(torch.randn(x0_samples.shape)).to(x0_samples.device)
+            batch = x0_samples.shape[0]
+            D = x0_samples.reshape(batch, -1).shape[1]
+            m = int(max(1, self.hutch_vector))
+
+            # store epsilon vectors
+            self.e = torch.sign(torch.randn(m, batch, D, device=x0_samples.device, dtype=x0_samples.dtype))
 
         if self.hutchpp is True:
             batch = x0_samples.shape[0]
