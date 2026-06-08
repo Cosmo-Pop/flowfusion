@@ -753,6 +753,67 @@ class ScoreModel(torch.nn.Module):
 
         return state[0][1, ...], state[1][1, ...]
 
+    @torch.no_grad()
+    def log_prob(
+        self,
+        x0_samples,
+        conditional=None,
+        atol=1e-4,
+        rtol=1e-4,
+        method="dopri5",
+        options={"min_step": 1e-6},
+    ):
+        """
+        Convenience function that performs the necessary ODE solves to compute
+        the log probability, and adds the base density term.
+
+        If `self.hutch` is `True`, the Skilling--Hutchinson trace estimator will
+        be used in the integrand.
+
+        If `self.hutchpp` is `True`, the Hutch++ trace estimator will be
+        used in the integrand. This uses a low-rank approximation via QR 
+        decomposition combined with a residual Hutchinson estimator for 
+        variance reduction.
+
+        If `self.xtrace` is `True`, the XTrace estimator will be used in
+        the integrand.
+
+        Parameters
+        ----------
+        x0_samples : torch.Tensor
+            Samples in parameter space, i.e., x(t=0).
+        conditional : torch.Tensor, optional
+            Conditional inputs.
+        atol : float, optional
+            Absolute error tolerance for ODE solver.
+        rtol : float, optional
+            Relative error tolerance for ODE solver.
+        method : string, optional
+            ODE solving routine.
+        options : dict, optional
+            Dictionary of additional ODE solver options.
+
+        Returns
+        -------
+        log_prob : torch.Tensor
+            Log probability density of `x0_samples`, i.e. p[x(t=0)].
+
+        See Also
+        --------
+        `solve_odes_forward` : Solves the ODEs to find p[x(t=0)] - p[x(t=T)].
+        """
+
+        xT, lp = self.solve_odes_forward(
+            x0_samples, 
+            conditional=conditional, 
+            atol=atol, 
+            rtol=rtol, 
+            method=method, 
+            options=options,
+        )
+        lp = lp + torch.sum(self.sde.prior(xT.shape).log_prob(xT), dim=1, keepdim=True)
+        return lp
+
 
 class VESDE(torch.nn.Module):
     """
