@@ -136,7 +136,9 @@ class ScoreModel(torch.nn.Module):
         Internal variable for tracking conditional inputs.
     no_sigma : bool
         If `True`, `model` is assumed to return score(x, t, conditional).
+        This is the default behaviour for an `SDE` of class `VPSDE`.
         If `False`, `model` is assumed to return score(x, t, conditional) * sigma(t).
+        This is the default behaviour for an `SDE` of class `VESDE`.
     prob : bool
         Internal variable to track whether the trace of the Jacobian is included
         in the forward call (automatically set/reset when calling `solve_odes_forward`).
@@ -160,7 +162,6 @@ class ScoreModel(torch.nn.Module):
         model=None, 
         sde=None, 
         conditional=None, 
-        no_sigma=False, 
         hutchinson=False, 
         hutchpp=False,
         hpp_rank = 1, 
@@ -177,9 +178,6 @@ class ScoreModel(torch.nn.Module):
             Stochastic differential equation. Usually a `VPSDE`, `VESDE` or `SUBVPSDE`.
         conditional : torch.Tensor, optional
             Initial value of conditioning variable (can be updated)
-        no_sigma : bool, optional
-            If `True`, `model` is assumed to return score(x, t, conditional).
-            If `False`, `model` is assumed to return score(x, t, conditional) * sigma(t).
         hutchinson : bool, optional
             If `True`, `solve_odes_forward` will be computed using the 
             Skilling--Hutchinson trace estimator.
@@ -201,9 +199,11 @@ class ScoreModel(torch.nn.Module):
         self.model = model  # see above
         self.sde = sde
         self.conditional = conditional  # stores the conditioning variable
-        self.no_sigma = (
-            no_sigma  # if True, drops the 1/sigma(t) in the score definition
-        )
+        # set no_sigma flag automatically now
+        if isinstance(sde, VESDE):
+            self.no_sigma = False 
+        else:
+            self.no_sigma = True  # if True, drops the 1/sigma(t) in the score definition
         self.prob = False
         self.hutch = hutchinson  # if True, uses the Hutchinson trace estimator
         self.hutchpp = hutchpp   # if True, uses the Hutch++ trace estimator
@@ -570,7 +570,7 @@ class ScoreModel(torch.nn.Module):
         atol=1e-4,
         rtol=1e-4,
         method="dopri5",
-        options=None,
+        options={"min_step": 1e-6},
     ):
         """
         Generate samples deterministically by solving ODE backwards in time from t=T to t=0.
@@ -600,6 +600,11 @@ class ScoreModel(torch.nn.Module):
         `torchdiffeq.odeint` : ODE solver used (including option definitions)
         `torchdiffeq.odeint_adjoint` : ODE solver used when backward pass needed
         """
+
+        # check atol/rtol
+        if atol > 1e-2 or rtol > 1e-2 or atol <= 0 or rtol <= 0:
+            print("WARNING: suspicious ODE solver tolerance detected!")
+            print("WARNING: found atol={:.3e} and rtol={:.3e}.".format(atol, rtol))
 
         # base samples (x(t))
         if hasattr(self.sde, "sigma_max"):
@@ -644,10 +649,10 @@ class ScoreModel(torch.nn.Module):
         self,
         x0_samples,
         conditional=None,
-        atol=1e-5,
-        rtol=1e-5,
+        atol=1e-4,
+        rtol=1e-4,
         method="dopri5",
-        options=None,
+        options={"min_step": 1e-6},
     ):
         """
         This solves the pair of ODEs forward in time to find the base samples, x(t=T),
@@ -692,6 +697,11 @@ class ScoreModel(torch.nn.Module):
         --------
         `sample_ode_from_base` : Solves in the opposite direction (from t=T to t=0).
         """
+
+        # check atol/rtol
+        if atol > 1e-2 or rtol > 1e-2 or atol <= 0 or rtol <= 0:
+            print("WARNING: low ODE solver tolerance detected!")
+            print("WARNING: found atol={:.1e} and rtol={:.1e}.".format(atol, rtol))
 
         # set prob to True
         self.prob = True
@@ -1439,9 +1449,8 @@ class PopulationModelDiffusion(torch.nn.Module):
         shift=None,
         scale=None,
         method="dopri5",
-        no_sigma=False,
         hutchinson=False,
-        options=None,
+        options={"min_step": 1e-6},
     ):
         """
         Parameters
@@ -1456,10 +1465,6 @@ class PopulationModelDiffusion(torch.nn.Module):
             Parameter scale for inputs/outputs.
         method : str, optional
             Name of ODE solver. Must be a valid `torchdiffeq` solver name.
-        no_sigma : bool, optional
-            If `True`, `model` is assumed to return score(x, t, conditional).
-            If `False`, `model` is assumed to return score(x, t, conditional) * sigma(t).
-            For a `VPSDE`, setting `no_sigma=True` is strongly recommended.
         hutchinson : bool, optional
             If `True`, `log_prob` will be computed using the Skilling--Hutchinson 
             trace estimator.  
@@ -1470,9 +1475,7 @@ class PopulationModelDiffusion(torch.nn.Module):
 
         self.model = model
         self.sde = sde
-        self.score_model = ScoreModel(
-            model=self.model, sde=self.sde, hutchinson=hutchinson, no_sigma=no_sigma
-        )
+        self.score_model = ScoreModel(model=self.model, sde=self.sde, hutchinson=hutchinson)
         self.register_buffer(
             "shift",
             (
@@ -1492,7 +1495,7 @@ class PopulationModelDiffusion(torch.nn.Module):
         self.method = method
         self.options = options
 
-    def forward(self, base_samples):
+    def forward(self, base_samples, atol=1e-4, rtol=1e-4):
         """
         Generate samples deterministically via an ODE solve.
         Applies any rescaling set by `self.shift` and `self.scale`.
@@ -1506,6 +1509,10 @@ class PopulationModelDiffusion(torch.nn.Module):
         -------
         target_samples : torch.Tensor
             Rescaled samples from target density, i.e., shift + x(t=0)*scale.
+        atol : float, optional
+            Absolute error tolerance for ODE solver.
+        rtol : float, optional
+            Relative error tolerance for ODE solver.
 
         See Also
         --------
@@ -1515,8 +1522,8 @@ class PopulationModelDiffusion(torch.nn.Module):
             self.score_model.sample_ode_from_base(
                 base_samples,
                 method=self.method,
-                atol=1e-5,
-                rtol=1e-5,
+                atol=atol,
+                rtol=rtol,
                 options=self.options,
             )[0]
             * self.scale
@@ -1546,7 +1553,7 @@ class PopulationModelDiffusion(torch.nn.Module):
         """
         return self.score_model.sample_sde(shape, steps=100) * self.scale + self.shift
 
-    def log_prob(self, x, atol=1e-5, rtol=1e-5):
+    def log_prob(self, x, atol=1e-4, rtol=1e-4):
         """
         Compute log probability of target samples, p[x(t=0)].
 
@@ -1622,9 +1629,8 @@ class PopulationModelDiffusionConditional(torch.nn.Module):
         scale=None,
         conditional_shift=None,
         conditional_scale=None,
-        no_sigma=False,
         method="dopri5",
-        options=None,
+        options={"min_step": 1e-6},
     ):
         """
         Parameters
@@ -1641,9 +1647,6 @@ class PopulationModelDiffusionConditional(torch.nn.Module):
             Parameter shift for conditional inputs.
         conditional_scale : torch.Tensor, optional
             Parameter scale for conditional inputs.
-        no_sigma : bool, optional
-            If `True`, `model` is assumed to return score(x, t, conditional).
-            If `False`, `model` is assumed to return score(x, t, conditional) * sigma(t).
         method : str, optional
             Name of ODE solver. Must be a valid `torchdiffeq` solver name.
         options : dict, optional
@@ -1654,7 +1657,7 @@ class PopulationModelDiffusionConditional(torch.nn.Module):
 
         self.model = model
         self.sde = sde
-        self.score_model = ScoreModel(model=self.model, sde=self.sde, no_sigma=no_sigma)
+        self.score_model = ScoreModel(model=self.model, sde=self.sde)
         self.register_buffer(
             "shift",
             (
@@ -1690,7 +1693,7 @@ class PopulationModelDiffusionConditional(torch.nn.Module):
         self.options = options
         self.method = method
 
-    def forward(self, base_samples, conditional=None):
+    def forward(self, base_samples, conditional=None, atol=1e-4, rtol=1e-4):
         """
         Generate samples deterministically via an ODE solve.
         Applies any rescaling set by `self.shift` and `self.scale`.
@@ -1701,6 +1704,10 @@ class PopulationModelDiffusionConditional(torch.nn.Module):
             Samples from base density, i.e., x(t=T) ~ N(0,1).
         conditional : torch.Tensor, optional
             Conditional inputs.
+        atol : float, optional
+            Absolute error tolerance for ODE solver.
+        rtol : float, optional
+            Relative error tolerance for ODE solver.
 
         Returns
         -------
@@ -1714,8 +1721,8 @@ class PopulationModelDiffusionConditional(torch.nn.Module):
                 conditional=(conditional - self.conditional_shift)
                 / self.conditional_scale,
                 method=self.method,
-                atol=1e-5,
-                rtol=1e-5,
+                atol=atol,
+                rtol=rtol,
                 options=self.options,
             )[0]
             * self.scale
@@ -1752,7 +1759,7 @@ class PopulationModelDiffusionConditional(torch.nn.Module):
             + self.shift
         )
 
-    def log_prob(self, x, conditional=None, atol=1e-5, rtol=1e-5):
+    def log_prob(self, x, conditional=None, atol=1e-4, rtol=1e-4):
         """
         Compute conditional log probability of target samples, p[x(t=0)|cond].
 
